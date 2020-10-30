@@ -1,0 +1,7 @@
+#!/bin/sh
+
+qemu-system-x86_64 -name seed \
+  -machine accel=kvm -cpu host -m 2G -nographic \
+  -netdev tap,id=n0,br=br0,helper=/usr/lib/qemu/qemu-bridge-helper \
+  -device virtio-net,netdev=n0 \
+  -boot n -option-rom /usr/lib/ipxe/qemu/pxe-virtio.rom

@@ -1,0 +1,13 @@
+#!/bin/sh -eux
+
+/usr/sbin/iucode_tool --write-earlyfw=$MACHINE.cpio.gz --overwrite /lib/firmware/intel-ucode
+
+(
+  cd /var/lib/machines/$MACHINE &&
+  find . -path ./boot -prune -o -print | \
+    LC_ALL=C sort | \
+    cpio --quiet -R +0:+0 --reproducible -o -H newc | \
+    gzip
+) >> $MACHINE.cpio.gz
+
+cp /var/lib/machines/$MACHINE/boot/vmlinuz-* $MACHINE.vmlinuz

@@ -1,0 +1,6 @@
+[Match]
+Type=ether
+Path=pci-*
+
+[Network]
+Bridge=br0
