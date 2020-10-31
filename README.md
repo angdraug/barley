@@ -2,16 +2,16 @@
 
 Barley is an ephemeral image-based bare metal provisioning system.
 
-A *provisioning* system installs a specific version and configuration of an
-operating system to multiple machines.
+- A **provisioning** system installs a specific version and configuration of an
+  operating system to multiple machines.
 
-*Bare metal* is physical hardware, as opposed to virtual machines or
-containers.
+- **Bare metal** is physical hardware, as opposed to virtual machines or
+  containers.
 
-*Image-based* provisioning uses pre-generated disk images instead of running an
-OS installer on every target host.
+- **Image-based** provisioning uses pre-generated disk images instead of
+  running an OS installer on every target host.
 
-*Ephemeral* means the OS is not preserved between reboots.
+- **Ephemeral** means the OS is not preserved between reboots.
 
 Barley build script combines a minimum base Debian system with Linux kernel and
 systemd-nspawn into a Seed initramfs image. Barley Sower serves the Seed image
