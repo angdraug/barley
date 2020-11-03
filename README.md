@@ -16,7 +16,7 @@ Barley is an ephemeral image-based bare metal provisioning system.
 Barley build script combines a minimum base Debian system with Linux kernel and
 systemd-nspawn into a Seed initramfs image. Barley Sower serves the Seed image
 using PXE network boot protocol. Barley Seed skips the pivot step of Linux boot
-process and runs systemd and the rest of the OS directly from rootfs.
+process and runs systemd and the rest of the OS directly from rootfs in RAM.
 
 Every reboot provisions the latest OS image, and the entire boot/provision
 sequence takes approximately 10s from initiating network boot to accepting SSH
@@ -26,11 +26,13 @@ connections and launching containers.
 
 ```
 ln -s ~/.ssh/id_ed25519.pub .
-packer build -only '*.seed' .
-packer build -only '*.sower' .
-echo -e '[Network]\nBridge=br0' > /etc/systemd/nspawn/sower.nspawn
-machinectl start sower
-./test-seed
+sudo packer build -only '*.seed' .
+sudo packer build -only '*.sower' .
+sudo cp sower.nspawn /etc/systemd/nspawn/
+sudo machinectl start sower
+sudo cp test-seed.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start test-seed
 ```
 
 ## Setup
@@ -45,8 +47,8 @@ Prerequisites:
 When installing Packer from Debian, use `apt-get --no-install-recommends` to
 prevent it from also installing Docker as a dependency.
 
-After building the packer-builder-nspawn and packer-provisioner-apt plugins,
-symlink them into your working directory so that Packer can find them.
+When building the packer-builder-nspawn and packer-provisioner-apt plugins from
+source, symlink them into your working directory so that Packer can find them.
 
 Before building the Seed image, symlink your public SSH key into your working
 directory. Seed root account is passwordless and the only way to access a Seed
@@ -82,9 +84,9 @@ came at the cost of centralizing cloud infrastructure into town sized data
 halls owned by a handful of large corporations.
 
 Building the under-cloud on your own hardware doesn't scale down: the cost of
-your own time spent on running the infrastructre quickly the cost of paying
-public cloud providers 5-20x of what the same compute and storage capacity
-would have cost you in hardware and electricity.
+your own time spent on running the infrastructre often outweighs the cost of
+paying public cloud providers 5-20x of what the same compute and storage
+capacity would have cost you in your own hardware and electricity.
 
 Barley attempts to close this gap and make bare metal provisioning as
 effortless at the scale of a home lab as it is at the scale of a datacenter.
@@ -92,18 +94,46 @@ Where enterprise grade and web scale solutions overwhelm you with configuration
 variations and micro-optimizations, Barley takes away your options until what's
 left is simple enough to just work.
 
+## Implementation
+
 In a continuously deployed cloud native environment, you more often need to
-update your OS than you need to reboot your servers. So what's the point of
+update your OS than you need to reboot your servers. What's the point of
 writing OS image to persistent storage if you'll need to replace it more than
-once by the time you reboot?
+once by the time you need to reboot?
 
-At datacenter scale, the labor cost of compiling your own kernels with just the
-drivers you need to save 200MB of RAM per host might pay off. At home, you're
-better off standing on the shoulders of giants and using distro kernels.
+Instead, Barley Seed runs directly out of
+[rootfs](https://www.kernel.org/doc/Documentation/filesystems/ramfs-rootfs-initramfs.txt).
+In modern Linux, rootfs is based on
+[tmpfs](https://www.kernel.org/doc/Documentation/filesystems/ramfs-rootfs-initramfs.txt),
+an in-memory filesystem that is effectively just page cache without the backing
+block storage. On a busy system, most of code and data from your OS and your
+container images would end up in the page cache anyway, so the real memory cost
+of running the OS without a backing block device is smaller than the 650MB
+taken up by the unpacked Seed image.
 
-Same goes for Barley's choice of systemd-nspawn as container runtime and APT
-for package management. The fundamental building bricks of a mature Linux
-distro are most readily available, easiest to learn, and least likely to break.
+Barley leaves room for some memory optimizations that bring too much complexity
+to be worth the trouble for most users:
+
+- Set up a CI pipeline to compile your own kernels with just the drivers for
+  your hardware, and use those when building Seed images. You will save up to
+  250MB per host (that's only 3% of 8GB, use distro kernels you miser).
+
+- Create and mount an [encrypted swap
+  partition](https://wiki.archlinux.org/index.php/Dm-crypt/Swap_encryption) on
+  persistent storage. Savings depend on how much rarely used data is baked into
+  your container images, the costs include taking IOPS away from your databases
+  and increasing your SSD burn rate.
+
+- Setting up [ksmtuned](https://www.kernel.org/doc/Documentation/vm/ksm.txt)
+  can save a good percentage of memory if you run many small containers
+  (packer-builder-nspawn base image that is likely to be shared between the
+  Seed OS and all your containers unpacks to 200MB). The costs are a small
+  fraction of CPU and a potential side channel attack surface.
+
+The quest for simplicity above all also dictates Barley's choice of
+systemd-nspawn as container runtime and APT as the preferred package manager.
+The fundamental building bricks of a mature Linux distro are most readily
+available, easiest to learn, and least likely to break.
 
 ## Copying
 
