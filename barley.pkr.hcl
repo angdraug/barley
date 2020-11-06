@@ -15,6 +15,19 @@ build {
     ]
   }
 
+  provisioner "file" {
+    source = "ssh-host-key.service"
+    destination = "/etc/systemd/system/ssh-host-key.service"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "rm /etc/ssh/ssh_host_*",
+      "echo HostKey=/etc/ssh/ssh_host_ed25519_key > /etc/ssh/sshd_config.d/host-key",
+      "/bin/systemctl enable ssh-host-key.service",
+    ]
+  }
+
   provisioner "shell" {
     inline = ["/usr/bin/install -d -m 700 /root/.ssh"]
   }
