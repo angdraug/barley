@@ -1,3 +1,11 @@
+source "nspawn" "base" {
+    variant = "minbase"
+}
+
+build {
+  sources = ["source.nspawn.base"]
+}
+
 source "nspawn" "seed" {
   clone = "base"
 }
@@ -114,5 +122,18 @@ build {
       "/bin/chmod 755 /usr/local/bin/update-sower-ipaddress",
       "/bin/systemctl enable update-sower-ipaddress.service",
     ]
+  }
+
+  post-processors {
+    post-processor "shell-local" {
+      inline = [
+        "rm -f seed.cpio.gz seed.vmlinuz",
+        "tar --zstd -C /var/lib/machines/sower -cf sower.tar.zst .",
+      ]
+    }
+
+    post-processor "artifice" {
+      files = ["sower.tar.zst"]
+    }
   }
 }

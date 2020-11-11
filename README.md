@@ -26,8 +26,7 @@ connections and launching containers.
 
 ```
 ln -s ~/.ssh/id_ed25519.pub .
-sudo packer build -only '*.seed' .
-sudo packer build -only '*.sower' .
+sudo make
 sudo cp sower.nspawn /etc/systemd/nspawn/
 sudo machinectl start sower
 sudo cp test-seed.service /etc/systemd/system/
