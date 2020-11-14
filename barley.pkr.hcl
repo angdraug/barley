@@ -81,25 +81,20 @@ build {
   sources = ["source.nspawn.sower"]
 
   provisioner "apt" {
-    packages = ["dnsmasq", "nginx-light", "pxelinux", "syslinux-common"]
+    packages = ["dnsmasq", "nginx-light", "ipxe"]
   }
 
   provisioner "file" {
-    sources = ["seed.cpio.gz", "seed.vmlinuz"]
+    sources = ["seed.cpio.gz", "seed.vmlinuz", "seed.ipxe"]
     destination = "/var/www/html/"
   }
 
   provisioner "shell" {
     inline = [
-      "mkdir -p /srv/tftp/pxelinux.cfg",
-      "ln -s /usr/lib/PXELINUX/lpxelinux.0 /srv/tftp/",
-      "ln -s /usr/lib/syslinux/modules/bios/ldlinux.c32 /srv/tftp/",
+      "mkdir -p /srv/tftp",
+      "ln -s /boot/ipxe.efi /srv/tftp/",
+      "ln -s /usr/lib/ipxe/undionly.kpxe /srv/tftp/",
     ]
-  }
-
-  provisioner "file" {
-    source = "pxelinux.cfg"
-    destination = "/srv/tftp/pxelinux.cfg/default"
   }
 
   provisioner "file" {

@@ -1,4 +1,5 @@
 #!/bin/sh
 ADDRESS=$(networkctl status -n0 --no-pager | awk '/Address:/{print $2}')
-sed -i "s/^dhcp-range=.*$/dhcp-range=$ADDRESS,proxy/" /etc/dnsmasq.d/sower.conf
-sed -i "s|//[0-9.]*/|//$ADDRESS/|" /srv/tftp/pxelinux.cfg/default
+sed -i -e "s/^dhcp-range=.*$/dhcp-range=$ADDRESS,proxy/" \
+	-e "s|//[0-9.]*/|//$ADDRESS/|" \
+	/etc/dnsmasq.d/sower.conf
