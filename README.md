@@ -29,9 +29,9 @@ ln -s ~/.ssh/id_ed25519.pub .
 sudo make
 sudo cp sower.nspawn /etc/systemd/nspawn/
 sudo machinectl start sower
-sudo cp test-seed.service /etc/systemd/system/
+sudo cp qemu-seed.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl start test-seed
+sudo systemctl start qemu-seed
 ```
 
 ## Setup
