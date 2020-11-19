@@ -1,0 +1,13 @@
+[Unit]
+Description=Register Barley Seed with the Sower
+Requires=network-online.target
+After=network-online.target
+Wants=ssh-host-key.service
+Before=ssh-host-key.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/register-barley-seed
+
+[Install]
+WantedBy=ssh-host-key.service

@@ -16,33 +16,11 @@ build {
   provisioner "apt" {
     packages = [
       # required
-      "linux-image-amd64", "openssh-server",
+      "linux-image-amd64", "openssh-server", "curl",
 
       # troubleshooting tools (optional)
       "iproute2", "less", "linux-perf", "sysstat", "vim-tiny",
     ]
-  }
-
-  provisioner "file" {
-    source = "ssh-host-key.service"
-    destination = "/etc/systemd/system/ssh-host-key.service"
-  }
-
-  provisioner "shell" {
-    inline = [
-      "rm /etc/ssh/ssh_host_*",
-      "echo HostKey=/etc/ssh/ssh_host_ed25519_key > /etc/ssh/sshd_config.d/host-key",
-      "/bin/systemctl enable ssh-host-key.service",
-    ]
-  }
-
-  provisioner "shell" {
-    inline = ["/usr/bin/install -d -m 700 /root/.ssh"]
-  }
-
-  provisioner "file" {
-    source = "id_ed25519.pub"
-    destination = "/root/.ssh/authorized_keys"
   }
 
   provisioner "file" {
@@ -54,8 +32,30 @@ build {
     destination = "/etc/systemd/network/"
   }
 
+  provisioner "file" {
+    source = "register-barley-seed"
+    destination = "/usr/local/bin/register-barley-seed"
+  }
+
+  provisioner "file" {
+    sources = ["register-barley-seed.service", "ssh-host-key.service"]
+    destination = "/etc/systemd/system/"
+  }
+
   provisioner "shell" {
-    inline = ["/bin/sed -i 's/^#*SystemMaxUse=.*$/SystemMaxUse=32M/' /etc/systemd/journald.conf"]
+    inline = [
+      "/bin/sed -i 's/^#*SystemMaxUse=.*$/SystemMaxUse=32M/' /etc/systemd/journald.conf",
+      "rm /etc/ssh/ssh_host_*",
+      "echo HostKey=/etc/ssh/ssh_host_ed25519_key > /etc/ssh/sshd_config.d/host-key",
+      "/bin/chmod 755 /usr/local/bin/register-barley-seed",
+      "/bin/systemctl enable register-barley-seed ssh-host-key.service",
+      "/usr/bin/install -d -m 700 /root/.ssh",
+    ]
+  }
+
+  provisioner "file" {
+    source = "id_ed25519.pub"
+    destination = "/root/.ssh/authorized_keys"
   }
 
   post-processors {
@@ -81,42 +81,37 @@ build {
   sources = ["source.nspawn.sower"]
 
   provisioner "apt" {
-    packages = ["dnsmasq", "nginx-light", "ipxe"]
-  }
-
-  provisioner "file" {
-    sources = ["seed.cpio.gz", "seed.vmlinuz", "seed.ipxe"]
-    destination = "/var/www/html/"
-  }
-
-  provisioner "shell" {
-    inline = [
-      "mkdir -p /srv/tftp",
-      "ln -s /boot/ipxe.efi /srv/tftp/",
-      "ln -s /usr/lib/ipxe/undionly.kpxe /srv/tftp/",
-    ]
+    packages = ["dnsmasq", "ipxe"]
   }
 
   provisioner "file" {
     source = "dnsmasq.conf"
-    destination = "/etc/dnsmasq.d/sower.conf"
+    destination = "/etc/dnsmasq.d/barley.conf"
   }
 
   provisioner "file" {
-    source = "update-sower-ipaddress"
-    destination = "/usr/local/bin/update-sower-ipaddress"
+    sources = ["target/release/barley", "update-barley-ipaddress"]
+    destination = "/usr/local/bin/"
   }
 
   provisioner "file" {
-    source = "update-sower-ipaddress.service"
-    destination = "/etc/systemd/system/update-sower-ipaddress.service"
+    sources = ["barley.service", "update-barley-ipaddress.service"]
+    destination = "/etc/systemd/system/"
   }
 
   provisioner "shell" {
     inline = [
-      "/bin/chmod 755 /usr/local/bin/update-sower-ipaddress",
-      "/bin/systemctl enable update-sower-ipaddress.service",
+      "mkdir -p /srv/tftp /srv/barley",
+      "ln -s /boot/ipxe.efi /usr/lib/ipxe/undionly.kpxe /srv/tftp/",
+      "install -d -m 775 -g www-data /var/lib/barley",
+      "/bin/chmod 755 /usr/local/bin/barley /usr/local/bin/update-barley-ipaddress",
+      "/bin/systemctl enable barley.service update-barley-ipaddress.service",
     ]
+  }
+
+  provisioner "file" {
+    sources = ["seed.cpio.gz", "seed.vmlinuz"]
+    destination = "/srv/barley/"
   }
 
   post-processors {

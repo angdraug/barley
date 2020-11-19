@@ -26,17 +26,24 @@ connections and launching containers.
 
 ```
 ln -s ~/.ssh/id_ed25519.pub .
+make release
 sudo make
+
 sudo cp sower.nspawn /etc/systemd/nspawn/
 sudo machinectl start sower
+
 sudo cp qemu-seed.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl start qemu-seed
+
+sudo systemd-run -M sower -P --wait -q /bin/sh -c \
+  "cd /var/lib/barley; grep -H . */public | awk -F/public: '//{print \$2, \$1}'"
 ```
 
 ## Setup
 
 Prerequisites:
+- [Rust](https://www.rust-lang.org/)
 - [Packer](https://packer.io/)
 - [packer-builder-nspawn](https://git.sr.ht/~angdraug/packer-builder-nspawn)
 - [packer-provisioner-apt](https://git.sr.ht/~angdraug/packer-provisioner-apt)

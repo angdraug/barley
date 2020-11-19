@@ -1,4 +1,0 @@
-#!ipxe
-kernel seed.vmlinuz rdinit=/lib/systemd/systemd console=ttyS0
-initrd seed.cpio.gz
-boot

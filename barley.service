@@ -1,0 +1,13 @@
+[Unit]
+Description=Barley web server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/barley
+Type=simple
+Restart=on-failure
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

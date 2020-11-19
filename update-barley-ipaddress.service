@@ -1,0 +1,13 @@
+[Unit]
+Description=Update IP address in dnsmasq and pxelinux configs
+Requires=network-online.target
+After=network-online.target
+Wants=dnsmasq.service barley.service
+Before=dnsmasq.service barley.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/update-barley-ipaddress
+
+[Install]
+WantedBy=dnsmasq.service barley.service
