@@ -2,6 +2,8 @@ packer-builder-nspawn
 packer-provisioner-apt
 *.cpio.gz
 *.vmlinuz
+*.tar.zst
+*.gpg
 id_ed25519
 id_ed25519.pub
 /target

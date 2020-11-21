@@ -38,6 +38,9 @@ sudo systemctl start qemu-seed
 
 sudo systemd-run -M sower -P --wait -q /bin/sh -c \
   "cd /var/lib/barley; grep -H . */public | awk -F/public: '//{print \$2, \$1}'"
+
+sudo make postgres.tar.zst
+zstdcat postgres.tar.zst | ssh qemu-seed machinectl import-tar - postgres
 ```
 
 ## Setup
