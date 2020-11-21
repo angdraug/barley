@@ -18,7 +18,7 @@ build {
   post-processors {
     post-processor "shell-local" {
       inline = [
-        "rm -f seed.cpio.gz seed.vmlinuz",
+        "rm -f getenvoy.gpg",
         "tar --zstd -C /var/lib/machines/envoy -cf envoy.tar.zst .",
       ]
     }
