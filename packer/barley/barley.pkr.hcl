@@ -44,6 +44,7 @@ build {
 
   provisioner "shell" {
     inline = [
+      "/bin/sed 's/--network-veth/--network-bridge=br0/' /lib/systemd/system/systemd-nspawn@.service > /etc/systemd/system/systemd-nspawn@.service",
       "/bin/sed -i 's/^#*SystemMaxUse=.*$/SystemMaxUse=32M/' /etc/systemd/journald.conf",
       "rm /etc/ssh/ssh_host_*",
       "echo HostKey=/etc/ssh/ssh_host_ed25519_key > /etc/ssh/sshd_config.d/host-key",
