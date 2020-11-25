@@ -6,17 +6,7 @@ build {
   sources = ["source.nspawn.synapse"]
 
   provisioner "apt" {
-    packages = ["matrix-synapse", "python3-psycopg2"]
-  }
-
-  provisioner "shell" {
-    inline = [
-      <<EOF
-        sed 's/^DHCP=yes/DHCP=yes\nIPv6AcceptRA=no/' \
-          < /lib/systemd/network/80-container-host0.network \
-          > /etc/systemd/network/80-container-host0.network
-      EOF
-    ]
+    packages = ["matrix-synapse", "python3-psycopg2", "nginx-light"]
   }
 
   post-processors {
