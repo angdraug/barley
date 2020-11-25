@@ -4,7 +4,6 @@ After=network.target
 
 [Service]
 ExecStart=/usr/local/bin/barley
-Type=simple
 Restart=on-failure
 User=www-data
 Group=www-data
