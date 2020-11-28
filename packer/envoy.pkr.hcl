@@ -1,5 +1,5 @@
 source "nspawn" "envoy" {
-  variant = "minbase"
+  clone = "base"
 }
 
 build {

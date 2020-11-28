@@ -1,5 +1,5 @@
 source "nspawn" "postgres" {
-  variant = "minbase"
+  clone = "base"
 }
 
 build {

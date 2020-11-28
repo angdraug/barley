@@ -1,5 +1,5 @@
 source "nspawn" "synapse" {
-  variant = "minbase"
+  clone = "base"
 }
 
 build {

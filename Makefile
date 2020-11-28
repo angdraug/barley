@@ -8,20 +8,28 @@ target/release/barley: Cargo.toml src/main.rs src/lib.rs
 test:
 	cargo test
 
-sower.tar.zst:
-	packer build -only '*.base' packer/barley
-	packer build -only '*.seed' packer/barley
-	packer build -only '*.sower' packer/barley
-	machinectl remove base seed
+base.tar.zst:
+	packer build packer/base.pkr.hcl
 
-envoy.tar.zst:
-	packer build packer/envoy
+sower.tar.zst: base.tar.zst
+	packer build packer/seed.pkr.hcl
+	packer build packer/sower.pkr.hcl
+	machinectl remove seed
+
+images: envoy.tar.zst nginx.tar.zst postgres.tar.zst synapse.tar.zst
+
+envoy.tar.zst: base.tar.zst
+	packer build packer/envoy.pkr.hcl
 	machinectl remove envoy
 
-postgres.tar.zst:
-	packer build packer/postgres
+nginx.tar.zst: base.tar.zst
+	packer build packer/nginx.pkr.hcl
+	machinectl remove nginx
+
+postgres.tar.zst: base.tar.zst
+	packer build packer/postgres.pkr.hcl
 	machinectl remove postgres
 
-synapse.tar.zst:
-	packer build packer/synapse
+synapse.tar.zst: base.tar.zst
+	packer build packer/synapse.pkr.hcl
 	machinectl remove synapse
