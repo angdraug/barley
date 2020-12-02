@@ -10,13 +10,7 @@ build {
   }
 
   provisioner "shell" {
-    inline = [
-      <<EOF
-        sed 's/^DHCP=yes/DHCP=yes\nIPv6AcceptRA=no/' \
-          < /lib/systemd/network/80-container-host0.network \
-          > /etc/systemd/network/80-container-host0.network
-      EOF
-    ]
+    script = "no-ipv6.sh"
   }
 
   post-processors {

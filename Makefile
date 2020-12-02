@@ -18,6 +18,10 @@ sower.tar.zst: base.tar.zst
 
 images: envoy.tar.zst nginx.tar.zst postgres.tar.zst synapse.tar.zst
 
+cryptpad.tar.zst: base.tar.zst
+	packer build packer/cryptpad.pkr.hcl
+	machinectl remove cryptpad
+
 envoy.tar.zst: base.tar.zst
 	packer build packer/envoy.pkr.hcl
 	machinectl remove envoy

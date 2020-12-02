@@ -9,6 +9,10 @@ build {
     packages = ["matrix-synapse", "python3-psycopg2", "nginx-light"]
   }
 
+  provisioner "shell" {
+    script = "no-ipv6.sh"
+  }
+
   post-processors {
     post-processor "shell-local" {
       inline = [

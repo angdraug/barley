@@ -1,0 +1,12 @@
+[Unit]
+Description=CryptPad service
+
+[Service]
+ExecStart=/usr/bin/node /home/cryptpad/cryptpad/server.js
+WorkingDirectory=/var/lib/cryptpad
+Restart=on-failure
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target
