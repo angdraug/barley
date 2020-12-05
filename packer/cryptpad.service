@@ -3,7 +3,7 @@ Description=CryptPad service
 
 [Service]
 ExecStart=/usr/bin/node /home/cryptpad/cryptpad/server.js
-WorkingDirectory=/var/lib/cryptpad
+WorkingDirectory=/home/cryptpad/cryptpad
 Restart=on-failure
 User=www-data
 Group=www-data
