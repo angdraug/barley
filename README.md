@@ -32,6 +32,8 @@ sudo make
 sudo cp sower.nspawn /etc/systemd/nspawn/
 sudo machinectl start sower
 
+sudo mkdir /etc/qemu
+echo allow br0 > /etc/qemu/bridge.conf
 sudo cp qemu-seed.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl start qemu-seed

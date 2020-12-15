@@ -8,10 +8,10 @@ build {
   provisioner "apt" {
     packages = [
       # required
-      "linux-image-amd64", "openssh-server", "curl",
+      "linux-image-amd64", "iproute2", "openssh-server", "curl",
 
       # troubleshooting tools (optional)
-      "iproute2", "less", "linux-perf", "sysstat", "vim-tiny",
+      "less", "linux-perf", "sysstat", "vim-tiny",
     ]
   }
 

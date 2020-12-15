@@ -6,7 +6,7 @@ After=network-online.target
 [Service]
 Type=exec
 ExecStart=/usr/bin/qemu-system-x86_64 -name seed \
-  -machine accel=kvm -cpu host -smp cores=2,threads=4 -m 4G -nographic \
+  -machine accel=kvm -cpu host -smp cores=2,threads=2 -m 4G -nographic \
   -netdev tap,id=n0,br=br0,helper=/usr/lib/qemu/qemu-bridge-helper \
   -device virtio-net,netdev=n0 \
   -boot n -option-rom /usr/lib/ipxe/qemu/pxe-virtio.rom

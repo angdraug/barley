@@ -1,4 +1,4 @@
 #!/bin/sh
 . /etc/default/barley-seed
-PUBLIC=$(hostname -I | perl -ane 'print grep /:/, @F')
+PUBLIC=$(ip address show dev br0 | awk '/inet6 / {print $2}' | grep -v '^f[cde]' | head -1 | cut -d/ -f1)
 curl -d otp="$OTP" -d public="$PUBLIC" http://"$SOWER":8000/register/$(hostname)
