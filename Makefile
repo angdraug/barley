@@ -16,7 +16,7 @@ sower.tar.zst: base.tar.zst
 	packer build packer/sower.pkr.hcl
 	machinectl remove seed
 
-images: envoy.tar.zst nginx.tar.zst postgres.tar.zst synapse.tar.zst
+images: cryptpad.tar.zst envoy.tar.zst nginx.tar.zst postgres.tar.zst synapse.tar.zst
 
 cryptpad.tar.zst: base.tar.zst
 	packer build packer/cryptpad.pkr.hcl
