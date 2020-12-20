@@ -1,7 +1,7 @@
 use rand::random;
 use regex::Regex;
 use std::{fs, io, net, str};
-use std::{convert::From, fmt::Debug, path::{Path, PathBuf}};
+use std::{convert::From, fmt::Debug, path::{Path, PathBuf}, process::Command};
 
 const IMAGE_DIR: &str = "/srv/barley";
 const DATA_DIR: &str = "/var/lib/barley";
@@ -99,7 +99,6 @@ boot
     pub fn init(&self, sower_ip: net::IpAddr) -> String {
         match self.otp() {
             Ok(otp)  => {
-                // TODO: destroy OTP
                 format!("SOWER={}\nOTP={}\n", sower_ip, otp)
             },
             Err(err) => {
@@ -109,12 +108,25 @@ boot
         }
     }
 
-    pub fn register(&self, otp: &str, public: &net::IpAddr) -> Result<String, Error> {
+    pub fn register(&self, otp: &str, public: &net::IpAddr, ssh: &str) -> Result<String, Error> {
         if otp != self.otp()? {
             return Err(Error::OtpError());
         }
+        fs::remove_file(self.path("otp"))?;
         fs::write(self.path("public"), format!("{}", public))?;
-        Ok(String::from(""))  // TODO: issue client cert
+        fs::write(self.path("ssh.pub"), ssh)?;
+        let status = Command::new("/usr/bin/ssh-keygen")
+            .arg("-I").arg(&self.name)
+            .arg("-s").arg("/var/lib/barley/ca")
+            .arg("-h")
+            .arg(self.path("ssh.pub"))
+            .status()?;
+        if !status.success() {
+            return Err(Error::CertError());
+        }
+        let cert = fs::read(self.path("ssh-cert.pub"))?;
+        let cert = str::from_utf8(&cert)?;
+        Ok(cert.to_owned())
     }
 
     fn path(&self, file: &str) -> PathBuf {
@@ -162,6 +174,7 @@ pub enum Error {
     IoError(io::Error),
     StrError(str::Utf8Error),
     OtpError(),
+    CertError(),
 }
 
 impl From<io::Error> for Error {

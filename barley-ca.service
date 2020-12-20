@@ -1,0 +1,14 @@
+[Unit]
+Description=Generate Barley SSH CA key
+Wants=barley.service
+Before=barley.service
+ConditionFileNotEmpty=!/var/lib/barley/ca
+
+[Service]
+Type=oneshot
+ExecStart=ssh-keygen -q -N '' -C barley -f /var/lib/barley/ca -t ed25519
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=barley.service

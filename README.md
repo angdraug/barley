@@ -37,12 +37,14 @@ echo allow br0 > /etc/qemu/bridge.conf
 sudo cp qemu-seed.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl start qemu-seed
+journalctl -f -u qemu-seed
 
-sudo systemd-run -M sower -P --wait -q /bin/sh -c \
-  "cd /var/lib/barley; grep -H . */public | awk -F/public: '//{print \$2, \$1}'"
+echo '@cert-authority *' \
+  $(sudo cat /var/lib/machines/sower/var/lib/barley/ca.pub) \
+  >> ~/.ssh/known_hosts
 
 sudo make postgres.tar.zst
-zstdcat postgres.tar.zst | ssh qemu-seed machinectl import-tar - postgres
+zstdcat postgres.tar.zst | ssh root@seed-1 machinectl import-tar - postgres
 ```
 
 ## Setup

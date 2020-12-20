@@ -6,7 +6,7 @@ build {
   sources = ["source.nspawn.sower"]
 
   provisioner "apt" {
-    packages = ["dnsmasq", "ipxe"]
+    packages = ["dnsmasq", "ipxe", "openssh-client"]
   }
 
   provisioner "file" {
@@ -20,7 +20,7 @@ build {
   }
 
   provisioner "file" {
-    sources = ["barley.service", "update-barley-ipaddress.service"]
+    sources = ["barley.service", "barley-ca.service", "update-barley-ipaddress.service"]
     destination = "/etc/systemd/system/"
   }
 
@@ -30,7 +30,7 @@ build {
       "ln -s /boot/ipxe.efi /usr/lib/ipxe/undionly.kpxe /srv/tftp/",
       "install -d -m 775 -g www-data /var/lib/barley",
       "/bin/chmod 755 /usr/local/bin/barley /usr/local/bin/update-barley-ipaddress",
-      "/bin/systemctl enable barley.service update-barley-ipaddress.service",
+      "/bin/systemctl enable barley.service barley-ca.service update-barley-ipaddress.service",
     ]
   }
 

@@ -1,4 +1,7 @@
-#!/bin/sh
+#!/bin/sh -eu
 . /etc/default/barley-seed
 PUBLIC=$(ip address show dev br0 | awk '/inet6 / {print $2}' | grep -v '^f[cde]' | head -1 | cut -d/ -f1)
-curl -d otp="$OTP" -d public="$PUBLIC" http://"$SOWER":8000/register/$(hostname)
+SSH=$(cat /etc/ssh/ssh_host_ed25519_key.pub)
+curl -s -o /etc/ssh/ssh_host_ed25519_key-cert.pub \
+	-d otp="$OTP" -d public="$PUBLIC" -d ssh="$SSH" \
+	http://"$SOWER":8000/register/$(hostname)

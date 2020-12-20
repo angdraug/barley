@@ -34,12 +34,16 @@ build {
     destination = "/etc/systemd/system/"
   }
 
+  provisioner "file" {
+    source = "ssh-host-key.conf"
+    destination = "/etc/ssh/sshd_config.d/key.conf"
+  }
+
   provisioner "shell" {
     inline = [
       "/bin/sed 's/--network-veth/--network-bridge=br0/' /lib/systemd/system/systemd-nspawn@.service > /etc/systemd/system/systemd-nspawn@.service",
       "/bin/sed -i 's/^#*SystemMaxUse=.*$/SystemMaxUse=32M/' /etc/systemd/journald.conf",
       "rm /etc/ssh/ssh_host_*",
-      "echo HostKey /etc/ssh/ssh_host_ed25519_key > /etc/ssh/sshd_config.d/host_key.conf",
       "/bin/chmod 755 /usr/local/bin/register-barley-seed",
       "/bin/systemctl enable register-barley-seed ssh-host-key.service",
       "/usr/bin/install -d -m 700 /root/.ssh",

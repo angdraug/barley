@@ -32,6 +32,7 @@ async fn init(
 struct RegisterForm {
     otp:    String,
     public: net::IpAddr,
+    ssh:    String,
 }
 
 #[post("/register/{name}")]
@@ -39,7 +40,7 @@ async fn register(
     web::Path(name): web::Path<String>,
     form:            web::Form<RegisterForm>
 ) -> impl Responder {
-    match barley::Seed::new(name).register(&form.otp, &form.public) {
+    match barley::Seed::new(name).register(&form.otp, &form.public, &form.ssh) {
         Ok(body) => HttpResponse::Ok().body(body),
         Err(err) => {
             eprintln!("{:?}", err);
