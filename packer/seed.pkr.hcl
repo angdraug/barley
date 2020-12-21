@@ -51,7 +51,7 @@ build {
   }
 
   provisioner "file" {
-    source = "id_ed25519.pub"
+    source = "authorized_keys"
     destination = "/root/.ssh/authorized_keys"
   }
 

@@ -24,13 +24,20 @@ connections and launching containers.
 
 ## Quick Start
 
-```
-ln -s ~/.ssh/id_ed25519.pub .
+```sh
+ssh-keygen -C barley -f ~/.ssh/id_barley -N '' -t ed25519
+ssh-keygen -I barley -s ~/.ssh/id_ed25519 -V +1d ~/.ssh/id_barley
+sed 's/^\(.*\)$/\1\ncert-authority \1/' < ~/.ssh/id_ed25519.pub > authorized_keys
+
 make release
 sudo make
 
 sudo cp sower.nspawn /etc/systemd/nspawn/
 sudo machinectl start sower
+
+echo '@cert-authority *' \
+  $(sudo cat /var/lib/machines/sower/var/lib/barley/ca.pub) \
+  >> ~/.ssh/known_hosts
 
 sudo mkdir /etc/qemu
 echo allow br0 > /etc/qemu/bridge.conf
@@ -39,12 +46,10 @@ sudo systemctl daemon-reload
 sudo systemctl start qemu-seed
 journalctl -f -u qemu-seed
 
-echo '@cert-authority *' \
-  $(sudo cat /var/lib/machines/sower/var/lib/barley/ca.pub) \
-  >> ~/.ssh/known_hosts
-
 sudo make postgres.tar.zst
-zstdcat postgres.tar.zst | ssh root@seed-1 machinectl import-tar - postgres
+zstdcat postgres.tar.zst | \
+  ssh -i ~/.ssh/id_barley -o StrictHostKeyChecking=yes root@seed-1 \
+  machinectl import-tar - postgres
 ```
 
 ## Setup
@@ -63,9 +68,11 @@ prevent it from also installing Docker as a dependency.
 When building the packer-builder-nspawn and packer-provisioner-apt plugins from
 source, symlink them into your working directory so that Packer can find them.
 
-Before building the Seed image, symlink your public SSH key into your working
-directory. Seed root account is passwordless and the only way to access a Seed
-host is by authenticating with that SSH key.
+Seed root account is passwordless and the only way to access a Seed host is by
+authenticating with an SSH key. Before building the Seed image, copy your
+public SSH key into `authorized_keys` in your working directory, and edit it to
+make SSH also accept it as a certificate authority. This will allow you to sign
+short-lived passwordless SSH certificates for use with automation.
 
 Seed starts with all its physical Ethernet interfaces bound to a Linux bridge
 named br0. For any container that requires public network, put a
