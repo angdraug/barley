@@ -108,12 +108,12 @@ boot
         }
     }
 
-    pub fn register(&self, otp: &str, public: &net::IpAddr, ssh: &str) -> Result<String, Error> {
+    pub fn register(&self, otp: &str, ip: &net::IpAddr, ssh: &str) -> Result<String, Error> {
         if otp != self.otp()? {
             return Err(Error::OtpError());
         }
         fs::remove_file(self.path("otp"))?;
-        fs::write(self.path("public"), format!("{}", public))?;
+        fs::write(self.path("ip"), format!("{}", ip))?;
         fs::write(self.path("ssh.pub"), ssh)?;
         let status = Command::new("/usr/bin/ssh-keygen")
             .arg("-I").arg(&self.name)
