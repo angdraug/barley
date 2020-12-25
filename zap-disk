@@ -1,0 +1,47 @@
+#!/bin/sh -eu
+CONFIRM=no
+DISKS=
+
+for ARG in "$@"; do
+	case $ARG in
+	--yes-i-want-to-destroy-all-data)
+		CONFIRM=yes
+		;;
+
+	--all)
+		DISKS=$(lsblk -dpn | awk '/disk/{print $1}')
+		;;
+
+	*)
+		if [ -b "$ARG" ]; then
+			DISKS="$DISKS $ARG"
+		else
+			echo Bad argument: $ARG is not a block device
+			exit 1
+		fi
+		;;
+	esac
+done
+
+if [ "no" = "$CONFIRM" ]; then
+	echo "Usage: $0 --yes-i-want-to-destroy-all-data <device | --all>"
+	exit 2
+fi
+
+for DISK in $DISKS; do
+	sgdisk -Z $DISK
+	sgdisk -N0 $DISK
+	sgdisk -t1:8309 $DISK
+
+	NAME=$(basename $DISK)
+	KEY=/root/luks-key-$NAME
+	touch $KEY
+	chmod 600 $KEY
+	dd if=/dev/random of=$KEY bs=512 count=1
+	cryptsetup -q luksFormat $DISK $KEY
+	cryptsetup -q --allow-discards --persistent \
+		--key-file $KEY open $DISK luks-$NAME
+
+	pvcreate /dev/mapper/luks-$NAME
+	vgcreate vg-$NAME /dev/mapper/luks-$NAME
+done

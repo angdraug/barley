@@ -5,6 +5,13 @@ source "nspawn" "postgres" {
 build {
   sources = ["source.nspawn.postgres"]
 
+  provisioner "shell" {
+    inline = [
+      "mkdir -p /etc/postgresql-common/createcluster.d",
+      "echo create_main_cluster = false > /etc/postgresql-common/createcluster.d/create.conf",
+    ]
+  }
+
   provisioner "apt" {
     packages = ["postgresql"]
   }

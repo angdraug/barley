@@ -8,9 +8,12 @@ build {
   provisioner "apt" {
     packages = [
       # required
-      "linux-image-amd64", "iproute2", "openssh-server", "curl",
+      "linux-image-amd64", "iproute2", "curl", "openssh-server",
 
-      # troubleshooting tools (optional)
+      # optional persistent storage management
+      "gdisk", "cryptsetup", "lvm2",
+
+      # optional troubleshooting tools
       "less", "linux-perf", "sysstat", "vim-tiny",
     ]
   }
@@ -25,8 +28,8 @@ build {
   }
 
   provisioner "file" {
-    source = "register-barley-seed"
-    destination = "/usr/local/bin/register-barley-seed"
+    sources = ["register-barley-seed", "zap-disk", "attach-disk"]
+    destination = "/usr/local/bin/"
   }
 
   provisioner "file" {
@@ -45,7 +48,9 @@ build {
       "/bin/sed -i 's/^#*SystemMaxUse=.*$/SystemMaxUse=32M/' /etc/systemd/journald.conf",
       "rm /etc/ssh/ssh_host_*",
       "/bin/chmod 755 /usr/local/bin/register-barley-seed",
-      "/bin/systemctl enable register-barley-seed ssh-host-key.service",
+      "/bin/chmod 755 /usr/local/bin/zap-disk",
+      "/bin/chmod 755 /usr/local/bin/attach-disk",
+      "/bin/systemctl enable register-barley-seed ssh-host-key",
       "/usr/bin/install -d -m 700 /root/.ssh",
     ]
   }

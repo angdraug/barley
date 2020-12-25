@@ -49,7 +49,7 @@ journalctl -f -u qemu-seed
 sudo make postgres.tar.zst
 zstdcat postgres.tar.zst | \
   ssh -i ~/.ssh/id_barley -o StrictHostKeyChecking=yes root@seed-1 \
-  machinectl import-tar - postgres
+  machinectl import-tar - postgres-1
 ```
 
 ## Setup
@@ -79,7 +79,7 @@ named br0. For any container that requires public network, put a
 [systemd.nspawn(5)](https://www.freedesktop.org/software/systemd/man/systemd.nspawn.html)
 file like below under `/etc/systemd/nspawn`:
 
-```
+```systemd
 [Network]
 Bridge=br0
 ```
@@ -88,6 +88,49 @@ Sower expects to be directly connected to a network that already has a DHCP
 server. You can use the same Linux bridge setup as described above to achieve
 that. Sower obtains its own IP configuration from DHCP and leaves it up to the
 existing DHCP server to allocate IP addresses to PXE clients.
+
+## Persistent Storage
+
+While the host OS managed by Barley and the container code managed by
+systemd-nspawn remain ephemeral, your data doesn't have to be.
+
+Seed image includes basic tools to manage persistent storage:
+
+- `zap-disk` creates a single GPT partition spanning the entire block device,
+  formats that partition to LUKS with a randomly generated 512-byte key file,
+  and creates an LVM volume group that you can slice into logical volumes.
+
+  It is up to you to safely backup the key file and redeploy it after rebooting
+  the Seed. If you lose the key you lose all data that was encrypted with it.
+  Always encrypt the key before writing it to any persistent storage:
+
+  ```sh
+  ssh seed-1 cat /root/luks-key-sda | gpg -e -o luks-key-sda.gpg
+  ```
+
+- `attach-disk` finds a logical volume with the same name as the container,
+  creates and formats a 4GB ext4 file system if such volume doesn't exist, and
+  mounts it to the specified path inside the container. You can override file
+  system size and type like this:
+
+  ```sh
+  SIZE=32G FS=xfs attach-disk postgres-1 /var/lib/postgresql
+  ```
+
+  The root directory of the new file system is going to be owned by host
+  `root`, you'll need to change its ownership to what your container expects:
+
+  ```sh
+  systemd-nspawn -M postgres-1 -UPq chown postgres:postgres /var/lib/postgresql
+  ```
+
+  By default, systemd-nspawn allocates uid namespaces based on consistent hash
+  of container name. This means that, unless you luck into a hash collision
+  between container names on the same Seed, file ownership in the persistent
+  volume is going to automatically remain in sync with the container user
+  namespace across container restarts and Seed host reboots.
+
+Remember that data on persistent storage still needs backups.
 
 ## Motivation
 
