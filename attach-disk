@@ -1,6 +1,7 @@
 #!/bin/sh -eu
 MACHINE=$1
 TARGET=$2
+OWNER=$3
 
 SIZE=${SIZE:-4G}
 FS=${FS:-ext4}
@@ -12,8 +13,15 @@ if [ -z "$VG" ]; then
 		# persistent storage not found, keep it all in RAM
 		exit 0
 	fi
-	lvcreate -L $SIZE $VG -n $MACHINE
+	lvcreate -qq -L $SIZE $VG -n $MACHINE
 	mkfs.$FS /dev/$VG/$MACHINE
 fi
 
 mount /dev/$VG/$MACHINE /var/lib/machines/$MACHINE/$TARGET
+
+SHIFT=$(stat -c%u /var/lib/machines/$MACHINE)
+TARGET_UID=$(( $SHIFT + $(grep "^$OWNER:" /var/lib/machines/$MACHINE/etc/passwd | cut -d: -f3) ))
+TARGET_GID=$(( $SHIFT + $(grep "^$OWNER:" /var/lib/machines/$MACHINE/etc/passwd | cut -d: -f4) ))
+if [ $TARGET_UID -ne $(stat -c%u /var/lib/machines/$MACHINE/$TARGET) ]; then
+	chown -R $TARGET_UID:$TARGET_GID /var/lib/machines/$MACHINE/$TARGET
+fi

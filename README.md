@@ -109,19 +109,13 @@ Seed image includes basic tools to manage persistent storage:
   ```
 
 - `attach-disk` finds a logical volume with the same name as the container,
-  creates and formats a 4GB ext4 file system if such volume doesn't exist, and
-  mounts it to the specified path inside the container. You can override file
+  creates and formats a 4GB ext4 file system if such volume doesn't exist,
+  mounts it to the specified path inside the container, and updates ownership
+  to the specified user within the container namespace. You can override file
   system size and type like this:
 
   ```sh
-  SIZE=32G FS=xfs attach-disk postgres-1 /var/lib/postgresql
-  ```
-
-  The root directory of the new file system is going to be owned by host
-  `root`, you'll need to change its ownership to what your container expects:
-
-  ```sh
-  systemd-nspawn -M postgres-1 -UPq chown postgres:postgres /var/lib/postgresql
+  SIZE=32G FS=xfs attach-disk postgres-1 /var/lib/postgresql postgres
   ```
 
   By default, systemd-nspawn allocates uid namespaces based on consistent hash
