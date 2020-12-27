@@ -38,9 +38,9 @@ for DISK in $DISKS; do
 	touch $KEY
 	chmod 600 $KEY
 	dd if=/dev/random of=$KEY bs=512 count=1
-	cryptsetup -q luksFormat $DISK $KEY
+	cryptsetup -q luksFormat ${DISK}1 $KEY
 	cryptsetup -q --allow-discards --persistent \
-		--key-file $KEY open $DISK luks-$NAME
+		--key-file $KEY open ${DISK}1 luks-$NAME
 
 	pvcreate /dev/mapper/luks-$NAME
 	vgcreate vg-$NAME /dev/mapper/luks-$NAME
