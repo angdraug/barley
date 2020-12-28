@@ -13,8 +13,8 @@ if [ -z "$VG" ]; then
 		# persistent storage not found, keep it all in RAM
 		exit 0
 	fi
-	lvcreate -qq -L $SIZE $VG -n $MACHINE
-	mkfs.$FS /dev/$VG/$MACHINE
+	lvcreate -y -L $SIZE $VG -n $MACHINE
+	mkfs.$FS -q /dev/$VG/$MACHINE
 fi
 
 mount /dev/$VG/$MACHINE /var/lib/machines/$MACHINE/$TARGET
