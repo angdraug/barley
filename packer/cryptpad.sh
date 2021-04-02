@@ -1,5 +1,5 @@
 #!/bin/sh
-git clone --depth 1 -b pass-archivepath-v4.0 https://github.com/angdraug/cryptpad.git cryptpad
+git clone --depth 1 -b 4.3.1 https://github.com/xwiki-labs/cryptpad.git cryptpad
 cd cryptpad
 rm -rf .git
 npm install

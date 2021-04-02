@@ -1,5 +1,5 @@
 module.exports = {
-    httpUnsafeOrigin: 'http://localhost:3000/',
+    httpUnsafeOrigin: 'http://localhost:3000',
     httpSafeOrigin: "https://your-sandbox-domain.com",
     adminEmail: 'admin@your-main-domain.com',
     blockDailyCheck: true,
