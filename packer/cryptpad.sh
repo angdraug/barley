@@ -4,3 +4,5 @@ cd cryptpad
 rm -rf .git
 npm install
 bower install
+bower cache clean
+npm cache clean --force
