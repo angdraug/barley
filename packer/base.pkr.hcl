@@ -5,6 +5,10 @@ source "nspawn" "base" {
 build {
   sources = ["source.nspawn.base"]
 
+  provisioner "shell" {
+    inline = ["echo LANG=C > /etc/default/locale"]
+  }
+
   post-processors {
     post-processor "shell-local" {
       inline = [
