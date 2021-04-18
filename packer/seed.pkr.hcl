@@ -8,7 +8,7 @@ build {
   provisioner "apt" {
     packages = [
       # required
-      "linux-image-amd64", "iproute2", "curl", "openssh-server",
+      "linux-image-amd64", "iproute2", "curl", "openssh-server", "gnutls-bin",
 
       # optional persistent storage management
       "gdisk", "cryptsetup", "lvm2",
@@ -28,12 +28,12 @@ build {
   }
 
   provisioner "file" {
-    sources = ["register-barley-seed", "zap-disk", "attach-disk"]
+    sources = ["barley-register", "zap-disk", "attach-disk"]
     destination = "/usr/local/bin/"
   }
 
   provisioner "file" {
-    sources = ["register-barley-seed.service", "ssh-host-key.service"]
+    sources = ["barley-machine-key.service", "barley-register.service", "ssh-host-key.service"]
     destination = "/etc/systemd/system/"
   }
 
@@ -44,14 +44,15 @@ build {
 
   provisioner "shell" {
     inline = [
-      "/bin/sed 's/--network-veth/--network-bridge=br0/' /lib/systemd/system/systemd-nspawn@.service > /etc/systemd/system/systemd-nspawn@.service",
-      "/bin/sed -i 's/^#*SystemMaxUse=.*$/SystemMaxUse=32M/' /etc/systemd/journald.conf",
+      "sed 's/--network-veth/--network-bridge=br0/' /lib/systemd/system/systemd-nspawn@.service > /etc/systemd/system/systemd-nspawn@.service",
+      "sed -i 's/^#*SystemMaxUse=.*$/SystemMaxUse=32M/' /etc/systemd/journald.conf",
       "rm /etc/ssh/ssh_host_*",
-      "/bin/chmod 755 /usr/local/bin/register-barley-seed",
-      "/bin/chmod 755 /usr/local/bin/zap-disk",
-      "/bin/chmod 755 /usr/local/bin/attach-disk",
-      "/bin/systemctl enable register-barley-seed ssh-host-key",
-      "/usr/bin/install -d -m 700 /root/.ssh",
+      "adduser --system --group --disabled-login --home /var/lib/barley barley",
+      "chmod 755 /usr/local/bin/barley-register",
+      "chmod 755 /usr/local/bin/zap-disk",
+      "chmod 755 /usr/local/bin/attach-disk",
+      "systemctl enable barley-machine-key barley-register ssh-host-key",
+      "install -d -m 700 /root/.ssh",
     ]
   }
 

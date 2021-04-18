@@ -7,7 +7,7 @@ Before=dnsmasq.service barley.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/update-barley-ipaddress
+ExecStart=/usr/local/bin/barley-ip
 
 [Install]
 WantedBy=dnsmasq.service barley.service

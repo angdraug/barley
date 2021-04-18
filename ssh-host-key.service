@@ -1,11 +1,7 @@
 [Unit]
 Description=Generate OpenSSH host key
-Wants=register-barley-seed.service ssh.service
-Before=register-barley-seed.service ssh.service
+ConditionFileNotEmpty=!/etc/ssh/ssh_host_ed25519_key
 
 [Service]
 Type=oneshot
 ExecStart=ssh-keygen -q -N '' -f /etc/ssh/ssh_host_ed25519_key -t ed25519
-
-[Install]
-WantedBy=register-barley-seed.service

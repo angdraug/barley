@@ -1,0 +1,9 @@
+[Unit]
+Description=Generate Barley machine key
+ConditionFileNotEmpty=!/var/lib/barley/machine.key
+
+[Service]
+Type=oneshot
+ExecStart=certtool --generate-privkey --key-type ed25519 --no-text --outfile /var/lib/barley/machine.key
+User=barley
+Group=barley
