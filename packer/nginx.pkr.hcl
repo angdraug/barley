@@ -21,6 +21,7 @@ build {
     post-processor "shell-local" {
       inline = [
         "tar --zstd -C /var/lib/machines/nginx -cf nginx.tar.zst .",
+        "machinectl remove nginx",
       ]
     }
 

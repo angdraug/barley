@@ -31,9 +31,11 @@ sed 's/^\(.*\)$/\1\ncert-authority \1/' < ~/.ssh/id_ed25519.pub > authorized_key
 
 make release
 sudo make
+sudo make install
 
-sudo cp sower.nspawn /etc/systemd/nspawn/
-sudo machinectl start sower
+sow new field-1
+sow import sower.tar.zst
+sow start --ca --local sower
 
 echo '@cert-authority *' \
   $(sudo cat /var/lib/machines/sower/var/lib/barley/ca.pub) \
@@ -59,6 +61,7 @@ Prerequisites:
 - [Packer](https://packer.io/)
 - [packer-builder-nspawn](https://git.sr.ht/~angdraug/packer-builder-nspawn)
 - [packer-provisioner-apt](https://git.sr.ht/~angdraug/packer-provisioner-apt)
+- gnutls-bin
 - intel-microcode
 - (optional) qemu-system-x86
 
@@ -75,7 +78,7 @@ make SSH also accept it as a certificate authority. This will allow you to sign
 short-lived passwordless SSH certificates for use with automation.
 
 Seed starts with all its physical Ethernet interfaces bound to a Linux bridge
-named br0. For any container that requires public network, put a
+named br0. When starting a new container with `sow start`, Barley will create a
 [systemd.nspawn(5)](https://www.freedesktop.org/software/systemd/man/systemd.nspawn.html)
 file like below under `/etc/systemd/nspawn`:
 
@@ -85,9 +88,10 @@ Bridge=br0
 ```
 
 Sower expects to be directly connected to a network that already has a DHCP
-server. You can use the same Linux bridge setup as described above to achieve
-that. Sower obtains its own IP configuration from DHCP and leaves it up to the
-existing DHCP server to allocate IP addresses to PXE clients.
+server (e.g. the router on a typical home network). You can use the same Linux
+bridge setup as described above to achieve that. Sower obtains its own IP
+configuration from DHCP and leaves it up to the existing DHCP server to
+allocate IP addresses to PXE clients.
 
 ## Persistent Storage
 
@@ -151,7 +155,7 @@ Where enterprise grade and web scale solutions overwhelm you with configuration
 variations and micro-optimizations, Barley takes away your options until what's
 left is simple enough to just work.
 
-## Implementation
+## Implementation Choices
 
 In a continuously deployed cloud native environment, you more often need to
 update your OS than you need to reboot your servers. What's the point of

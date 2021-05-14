@@ -8,7 +8,7 @@ build {
   provisioner "apt" {
     packages = [
       # required
-      "linux-image-amd64", "iproute2", "curl", "openssh-server", "gnutls-bin",
+      "linux-image-amd64", "iproute2", "curl", "openssh-server", "gnutls-bin", "jq", "zstd",
 
       # optional persistent storage management
       "gdisk", "cryptsetup", "lvm2",
@@ -65,6 +65,10 @@ build {
     post-processor "shell-local" {
       environment_vars = ["MACHINE=seed"]
       script = "make-initramfs"
+    }
+
+    post-processor "shell-local" {
+      command = "machinectl remove seed"
     }
 
     post-processor "artifice" {

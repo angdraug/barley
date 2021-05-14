@@ -20,6 +20,7 @@ build {
       inline = [
         "rm -f getenvoy.gpg",
         "tar --zstd -C /var/lib/machines/envoy -cf envoy.tar.zst .",
+        "machinectl remove envoy",
       ]
     }
 

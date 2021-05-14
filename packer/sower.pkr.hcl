@@ -47,8 +47,9 @@ build {
   post-processors {
     post-processor "shell-local" {
       inline = [
-        "rm -f seed.cpio.gz seed.vmlinuz",
         "tar --zstd -C /var/lib/machines/sower -cf sower.tar.zst .",
+        "rm -f seed.cpio.gz seed.vmlinuz",
+        "machinectl remove sower",
       ]
     }
 

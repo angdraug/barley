@@ -1,24 +1,101 @@
+use actix_web::ResponseError;
 use rand::random;
 use regex::Regex;
-use std::{fs, io, net, str};
-use std::{convert::From, fmt::Debug, path::{Path, PathBuf}, process::Command};
+use serde::{Deserialize, Serialize};
+use std::{error, fs, io, net, str, string};
+use std::{convert::From, fmt::{Debug, Display, Formatter}, path::PathBuf};
 
-const IMAGE_DIR: &str = "/srv/barley";
-const DATA_DIR: &str = "/var/lib/barley";
-const DNSMASQ: &str = "/etc/dnsmasq.d/barley.conf";
+pub mod ssh;
+pub mod tls;
 
-#[derive(Clone)]
-pub struct Sower<'a> {
-    pub ip: net::IpAddr,
-    images: &'a Path,
+#[derive(Serialize)]
+pub struct Certs {
+    ca:  String,
+    ssh: String,
+    tls: String,
 }
 
-impl<'a> Sower<'a> {
-    pub fn new() -> Sower<'a> {
-        check_data_dir();
-        Sower {
-            ip: detect_bind_ip(),
-            images: &Path::new(IMAGE_DIR),
+#[derive(Deserialize)]
+pub struct Registration {
+    otp: String,
+    ip:  net::IpAddr,
+    ssh: String,
+    csr: String,
+}
+
+#[derive(Clone)]
+pub struct Data {
+    home: PathBuf,
+}
+
+impl Data {
+    pub fn new(home: PathBuf) -> Result <Self, Error> {
+        if let Ok(m) = fs::metadata(&home) {
+            if !m.is_dir() {
+                return Err(Error::DataError(format!("Data directory {:?} is not a directory", home)));
+            }
+            if m.permissions().readonly() {
+                return Err(Error::DataError(format!("Data directory {:?} is not writeable", home)));
+            }
+        } else {
+            if let Err(err) = fs::create_dir(&home) {
+                return Err(Error::DataError(format!("Failed to create data directory {:?}: {}", home, err)));
+            }
+        };
+        Ok(Data { home })
+    }
+
+    pub fn reserve(&self, prefix: &str) -> Result<String, Error> {
+        for i in NameCounter::new() {
+            let name = format!("{}-{}", prefix, i);
+            let path = self.home.join(&name);
+            match fs::create_dir(&path) {
+                Ok(_)  => return Ok(name),
+                Err(err) => {
+                    if let Err(_) = fs::metadata(&path) {
+                        return Err(Error::DataError(format!("Failed to create {:?}: {}", path, err)));
+                    }
+                    // if path already exists, keep iterating
+                }
+            }
+        }
+        Err(Error::DataError(format!("Ran out of names for {} under {:?}", prefix, self.home)))
+    }
+
+    pub fn file(&self, name: &str) -> PathBuf {
+        self.home.join(name)
+    }
+
+    pub fn read(&self, name: &str) -> Result<String, Error> {
+        let path = self.file(&name);
+        match fs::read(&path) {
+            Ok(data) => Ok(String::from_utf8(data)?),
+            Err(err) => Err(Error::DataError(format!("Failed to read {:?}: {}", path, err))),
+        }
+    }
+
+    pub fn write(&self, name: &str, data: &str) -> Result<(), Error> {
+        let path = self.file(&name);
+        match fs::write(&path, &data) {
+            Ok(())   => Ok(()),
+            Err(err) => Err(Error::DataError(format!("Failed to write {:?}: {}", path, err))),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Sower {
+    pub ip: net::IpAddr,
+    pub images: Data,
+    data: Data,
+}
+
+impl Sower {
+    pub fn new(dnsmasq: &str, image_dir: &str, data_dir: &str) -> Self {
+        Self {
+            ip: Self::detect_bind_ip(dnsmasq),
+            images: Data::new(PathBuf::from(image_dir)).unwrap(),
+            data: Data::new(PathBuf::from(data_dir)).unwrap(),
         }
     }
 
@@ -26,66 +103,67 @@ impl<'a> Sower<'a> {
         format!("{}:8000", self.ip)
     }
 
-    pub fn image(&self, name: &str) -> PathBuf {
-        self.images.join(name)
+    pub fn ipxe(&self) -> Result<String, Error> {
+        let name = self.data.reserve("seed")?;
+        Ok(Seed::new(&self.data, &name)?.ipxe())
     }
-}
 
-fn check_data_dir() {
-    let m = match fs::metadata(DATA_DIR) {
-        Ok(m) => m,
-        Err(_) => panic!("Data directory {} not found", DATA_DIR),
-    };
-    if !m.is_dir() {
-        panic!("Data directory {} is not a directory", DATA_DIR);
+    pub fn init(&self, name: &str) -> Result<String, Error> {
+        Seed::new(&self.data, &name)?.otp().map(|otp| {
+            format!("SOWER={}\nOTP={}\n", &self.ip, otp)
+        })
     }
-    if m.permissions().readonly() {
-        panic!("Data directory {} is not writeable", DATA_DIR);
-    }
-}
 
-fn detect_bind_ip() -> net::IpAddr {
-    match fs::read(DNSMASQ) {
-        Ok(conf) => parse_dnsmasq(&str::from_utf8(&conf).unwrap()),
-        Err(err) => panic!("Failed to read {}: {}", DNSMASQ, err),
+    pub fn register(&self, name: &str, reg: &Registration) -> Result<Certs, Error> {
+        let seed = Seed::new(&self.data, &name)?;
+        seed.check_otp(&reg.otp)?;
+        seed.write_ip(&reg.ip)?;
+        let ssh_cert = seed.sign_ssh(&reg.ssh, &self.data.file("ca"))?;
+        let mut tls_cert = seed.sign_tls(
+            &reg.csr,
+            &self.data.file("machine.crt"),
+            &self.data.file("machine.key"),
+        )?;
+        tls_cert.push_str(&self.data.read("machine.crt")?);
+        Ok(Certs { ca: self.data.read("root.crt")?, ssh: ssh_cert, tls: tls_cert })
     }
-}
 
-fn parse_dnsmasq(conf: &str) -> net::IpAddr {
-    match Regex::new(r"http://(?P<ip>.*?):\d+/").unwrap().captures_iter(conf).next() {
-        Some(url) => {
-            match url["ip"].parse() {
-                Ok(ip)   => ip,
-                Err(err) => panic!("Failed to parse '{}': {}", &url["ip"], err),
-            }
-        },
-        None => panic!("Failed to find an IPv6 address in {}", DNSMASQ),
+    fn parse_dnsmasq(conf: &str) -> net::IpAddr {
+        match Regex::new(r"http://(?P<ip>.*?):\d+/").unwrap().captures_iter(conf).next() {
+            Some(url) => {
+                match url["ip"].parse() {
+                    Ok(ip)   => ip,
+                    Err(err) => panic!("Failed to parse '{}': {}", &url["ip"], err),
+                }
+            },
+            None => panic!("Did not find an IP address in dnsmasq.conf"),
+        }
+    }
+
+    fn detect_bind_ip(dnsmasq: &str) -> net::IpAddr {
+        match fs::read(&dnsmasq) {
+            Ok(conf) => Self::parse_dnsmasq(&str::from_utf8(&conf).unwrap()),
+            Err(err) => panic!("Failed to read {}: {}", dnsmasq, err),
+        }
     }
 }
 
 pub struct Seed {
     name: String,
+    data: Data,
 }
 
 impl Seed {
-    pub fn new(name: String) -> Seed {
-        Seed { name }
-    }
-
-    pub fn reserve() -> Seed {
-        for i in NameCounter::new() {
-            let name = format!("seed-{}", i);
-            if fs::create_dir(Path::new(DATA_DIR).join(&name)).is_ok() {
-                return Seed { name };
-            }
-        }
-        panic!("Ran out of names")
+    pub fn new(home: &Data, name: &str) -> Result<Self, Error> {
+        Ok(Seed {
+            name: name.to_string(),
+            data: Data::new(home.file(&name))?
+        })
     }
 
     pub fn ipxe(&self) -> String {
-        let otp: u128 = random();
-        if let Err(err) = fs::write(self.path("otp"), format!("{:0x}", otp)) {
-            eprintln!("Failed to write to {:?}: {}", self.path("otp"), err);
+        if let Err(err) = self.data.write("otp", &random_pw()) {
+            eprintln!("Failed to write to {:?}: {}", self.data.file("otp"), err);
             // complain but let it boot anyway
         }
         format!(r"#!ipxe
@@ -96,56 +174,48 @@ boot
 ", self.name, self.name)
     }
 
-    pub fn init(&self, sower_ip: net::IpAddr) -> String {
-        match self.otp() {
-            Ok(otp)  => {
-                format!("SOWER={}\nOTP={}\n", sower_ip, otp)
-            },
-            Err(err) => {
-                eprintln!("Failed to load OTP: {:?}", err);
-                "".to_owned()
-            },
-        }
+    pub fn otp(&self) -> Result<String, Error> {
+        self.data.read("otp")
     }
 
-    pub fn register(&self, otp: &str, ip: &net::IpAddr, ssh: &str) -> Result<String, Error> {
+    pub fn check_otp(&self, otp: &str) -> Result<(), Error> {
         if otp != self.otp()? {
+            eprintln!("OTP mismatch for {}", &self.name);
             return Err(Error::OtpError());
         }
-        fs::remove_file(self.path("otp"))?;
-        fs::write(self.path("ip"), format!("{}", ip))?;
-        fs::write(self.path("ssh.pub"), ssh)?;
-        let status = Command::new("/usr/bin/ssh-keygen")
-            .arg("-I").arg(&self.name)
-            .arg("-s").arg("/var/lib/barley/ca")
-            .arg("-h")
-            .arg(self.path("ssh.pub"))
-            .status()?;
-        if !status.success() {
-            return Err(Error::CertError());
-        }
-        let cert = fs::read(self.path("ssh-cert.pub"))?;
-        let cert = str::from_utf8(&cert)?;
-        Ok(cert.to_owned())
+        fs::remove_file(self.data.file("otp"))?;
+        Ok(())
     }
 
-    fn path(&self, file: &str) -> PathBuf {
-        Path::new(DATA_DIR).join(&self.name).join(file)
+    pub fn write_ip(&self, ip: &net::IpAddr) -> Result<(), Error> {
+        self.data.write("ip", &ip.to_string())
     }
 
-    fn otp(&self) -> Result<String, Error> {
-        let otp = fs::read(self.path("otp"))?;
-        let otp = str::from_utf8(&otp)?;
-        Ok(otp.to_owned())
+    fn sign_ssh(&self, key: &str, ca: &PathBuf) -> Result<String, Error> {
+        self.data.write("ssh.pub", key)?;
+        ssh::sign(&self.name, &ca, &self.data.file("ssh.pub"))?;
+        self.data.read("ssh-cert.pub")
+    }
+
+    fn sign_tls(&self, csr: &str, cacert: &PathBuf, cakey: &PathBuf) -> Result<String, Error> {
+        fs::write(self.data.file("csr"), csr)?;
+        tls::sign(
+            &self.name,
+            &cacert,
+            &cakey,
+            &self.data.file("csr"),
+            &self.data.file("crt"),
+        )?;
+        self.data.read("crt")
     }
 }
 
-struct NameCounter {
+pub struct NameCounter {
     count: [u8; 8],
 }
 
 impl NameCounter {
-    fn new() -> NameCounter {
+    pub fn new() -> Self {
         NameCounter { count: [b'0'; 8] }
     }
 }
@@ -169,23 +239,75 @@ impl Iterator for NameCounter {
     }
 }
 
+pub fn random_pw() -> String {
+    let pw: u128 = random();
+    format!("{:0x}", pw)
+}
+
+fn table_line(fields: &[&str], widths: &[usize]) -> String {
+    fields.iter().zip(widths.iter())
+        .map(|(f, w)| format!("{:1$} ", f, w))
+        .collect::<String>().trim_end().to_string()
+}
+
+pub fn print_table<'a, T, F>(list: &'a[T], plural: &str, headers: &[&str], fields: F)
+where F: Fn(&'a T) -> Vec<&'a str> {
+    if list.is_empty() {
+        println!("No {}.", &plural);
+        return;
+    }
+    let mut widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
+    for record in list {
+        let f = &fields(&record);
+        for i in 0..widths.len()-1 {
+            if i > f.len()-1 {
+                break;
+            }
+            if f[i].len() > widths[i] {
+                widths[i] = f[i].len()
+            }
+        }
+    }
+    println!("{}", table_line(&headers, &widths));
+    for record in list {
+        println!("{}", table_line(&fields(&record), &widths));
+    }
+}
+
 #[derive(Debug)]
 pub enum Error {
-    IoError(io::Error),
-    StrError(str::Utf8Error),
+    IoError(String),
+    StrError(String),
+    DataError(String),
     OtpError(),
     CertError(),
 }
 
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error: {:?}", self)
+    }
+}
+
+impl error::Error for Error {}
+
+impl ResponseError for Error {}
+
 impl From<io::Error> for Error {
-    fn from(error: io::Error) -> Self {
-        Error::IoError(error)
+    fn from(err: io::Error) -> Self {
+        Error::IoError(err.to_string())
     }
 }
 
 impl From<str::Utf8Error> for Error {
-    fn from(error: str::Utf8Error) -> Self {
-        Error::StrError(error)
+    fn from(err: std::str::Utf8Error) -> Self {
+        Error::StrError(err.to_string())
+    }
+}
+
+impl From<string::FromUtf8Error> for Error {
+    fn from(err: string::FromUtf8Error) -> Self {
+        Error::StrError(err.to_string())
     }
 }
 
@@ -204,21 +326,20 @@ mod tests {
     }
 
     #[test]
-    fn test_seed() {
-        let seed = Seed::new(String::from("foo"));
-        assert_eq!(seed.name, "foo");
-        assert_eq!(seed.path("bar"), Path::new("/var/lib/barley/foo/bar"));
+    fn test_data() {
+        let data = Data::new(PathBuf::from("/tmp")).unwrap();
+        assert_eq!(data.file("foo"), PathBuf::from("/tmp/foo"));
     }
 
     #[test]
     fn test_parse_dnsmasq() {
-        let ip = parse_dnsmasq("pxe-service=net:ipxe, X86PC,, http://127.0.0.1:8000/seed.ipxe");
+        let ip = Sower::parse_dnsmasq("pxe-service=net:ipxe, X86PC,, http://127.0.0.1:8000/seed.ipxe");
         assert!(ip.is_ipv4());
     }
 
     #[test]
     #[should_panic]
     fn test_parse_dnsmasq_fail() {
-        parse_dnsmasq("dhcp-range=127.0.0.1,proxy");
+        Sower::parse_dnsmasq("dhcp-range=127.0.0.1,proxy");
     }
 }

@@ -24,6 +24,7 @@ build {
     post-processor "shell-local" {
       inline = [
         "tar --zstd -C /var/lib/machines/postgres -cf postgres.tar.zst .",
+        "machinectl remove postgres",
       ]
     }
 

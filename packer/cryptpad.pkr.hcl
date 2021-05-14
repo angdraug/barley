@@ -55,6 +55,7 @@ build {
     post-processor "shell-local" {
       inline = [
         "tar --zstd -C /var/lib/machines/cryptpad -cf cryptpad.tar.zst .",
+        "machinectl remove cryptpad",
       ]
     }
 

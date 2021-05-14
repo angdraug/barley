@@ -2,8 +2,8 @@
 . /etc/default/barley-seed
 IP=$(ip address show dev br0 | awk '/inet / {print $2}' | grep -v '^169.254' | head -1 | cut -d/ -f1)
 SSH="$(cat /etc/ssh/ssh_host_ed25519_key.pub)"
-
 cd /var/lib/barley
+
 cat > machine.conf <<EOF
 dn=cn=$(hostname)
 signing_key
@@ -14,7 +14,13 @@ certtool --generate-request --no-text --load-privkey machine.key --outfile machi
 rm machine.conf
 CSR=$(LANG=C perl -pe 's/\n/\\n/' < machine.csr)
 
-curl -s -o /etc/ssh/ssh_host_ed25519_key-cert.pub \
+curl -s -o certs.json \
      -d '{"otp":"'"$OTP"'","ip":"'"$IP"'","ssh":"'"$SSH"'","csr":"'"$CSR"'"}' \
      -H 'Content-Type: application/json' \
      http://"$SOWER":8000/register/$(hostname)
+
+cat certs.json | jq -r .ca  > ca.crt
+cat certs.json | jq -r .ssh > /etc/ssh/ssh_host_ed25519_key-cert.pub
+cat certs.json | jq -r .tls > machine.crt
+cat ca.crt >> machine.crt
+rm certs.json

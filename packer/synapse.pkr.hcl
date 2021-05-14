@@ -17,6 +17,7 @@ build {
     post-processor "shell-local" {
       inline = [
         "tar --zstd -C /var/lib/machines/synapse -cf synapse.tar.zst .",
+        "machinectl remove synapse",
       ]
     }
 
