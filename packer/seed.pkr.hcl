@@ -73,7 +73,7 @@ build {
 
     post-processor "artifice" {
       files = [
-        "seed.cpio.gz",
+        "seed.cpio.zst",
         "seed.vmlinuz",
       ]
     }

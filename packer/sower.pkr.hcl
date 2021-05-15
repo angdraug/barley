@@ -40,7 +40,7 @@ build {
   }
 
   provisioner "file" {
-    sources = ["seed.cpio.gz", "seed.vmlinuz"]
+    sources = ["seed.cpio.zst", "seed.vmlinuz"]
     destination = "/srv/barley/"
   }
 
@@ -48,7 +48,7 @@ build {
     post-processor "shell-local" {
       inline = [
         "tar --zstd -C /var/lib/machines/sower -cf sower.tar.zst .",
-        "rm -f seed.cpio.gz seed.vmlinuz",
+        "rm -f seed.cpio.zst seed.vmlinuz",
         "machinectl remove sower",
       ]
     }

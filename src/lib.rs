@@ -168,7 +168,7 @@ impl Seed {
         }
         format!(r"#!ipxe
 kernel seed.vmlinuz rdinit=/lib/systemd/systemd systemd.hostname={} console=ttyS0
-initrd seed.cpio.gz
+initrd seed.cpio.zst
 initrd init/{} /etc/default/barley-seed
 boot
 ", self.name, self.name)

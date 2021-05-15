@@ -13,9 +13,9 @@ async fn vmlinuz(sower: web::Data<Sower>) -> Result<NamedFile> {
     Ok(NamedFile::open(sower.images.file("seed.vmlinuz"))?)
 }
 
-#[get("/seed.cpio.gz")]
+#[get("/seed.cpio.zst")]
 async fn cpio(sower: web::Data<Sower>) -> Result<NamedFile> {
-    Ok(NamedFile::open(sower.images.file("seed.cpio.gz"))?)
+    Ok(NamedFile::open(sower.images.file("seed.cpio.zst"))?)
 }
 
 #[get("/seed.ipxe")]
