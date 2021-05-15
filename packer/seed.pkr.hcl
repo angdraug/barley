@@ -56,11 +56,6 @@ build {
     ]
   }
 
-  provisioner "file" {
-    source = "authorized_keys"
-    destination = "/root/.ssh/authorized_keys"
-  }
-
   post-processors {
     post-processor "shell-local" {
       environment_vars = ["MACHINE=seed"]

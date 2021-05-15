@@ -19,8 +19,10 @@ curl -s -o certs.json \
      -H 'Content-Type: application/json' \
      http://"$SOWER":8000/register/$(hostname)
 
+install -d -m 700 /root/.ssh
+cat certs.json | jq -r .admin > /root/.ssh/authorized_keys
+cat certs.json | jq -r .host > /etc/ssh/ssh_host_ed25519_key-cert.pub
 cat certs.json | jq -r .ca  > ca.crt
-cat certs.json | jq -r .ssh > /etc/ssh/ssh_host_ed25519_key-cert.pub
-cat certs.json | jq -r .tls > machine.crt
+cat certs.json | jq -r .cert > machine.crt
 cat ca.crt >> machine.crt
 rm certs.json

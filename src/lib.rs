@@ -10,9 +10,10 @@ pub mod tls;
 
 #[derive(Serialize)]
 pub struct Certs {
-    ca:  String,
-    ssh: String,
-    tls: String,
+    admin: String,
+    host:  String,
+    ca:    String,
+    cert:  String,
 }
 
 #[derive(Deserialize)]
@@ -118,14 +119,16 @@ impl Sower {
         let seed = Seed::new(&self.data, &name)?;
         seed.check_otp(&reg.otp)?;
         seed.write_ip(&reg.ip)?;
-        let ssh_cert = seed.sign_ssh(&reg.ssh, &self.data.file("ca"))?;
-        let mut tls_cert = seed.sign_tls(
+        let admin = ssh::authorized_keys(&self.data.file("admin.pub"))?;
+        let host = seed.sign_ssh(&reg.ssh, &self.data.file("ca"))?;
+        let ca = self.data.read("root.crt")?;
+        let mut cert = seed.sign_tls(
             &reg.csr,
             &self.data.file("machine.crt"),
             &self.data.file("machine.key"),
         )?;
-        tls_cert.push_str(&self.data.read("machine.crt")?);
-        Ok(Certs { ca: self.data.read("root.crt")?, ssh: ssh_cert, tls: tls_cert })
+        cert.push_str(&self.data.read("machine.crt")?);
+        Ok(Certs { admin, host, ca, cert })
     }
 
     fn parse_dnsmasq(conf: &str) -> net::IpAddr {

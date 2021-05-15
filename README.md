@@ -25,10 +25,6 @@ connections and launching containers.
 ## Quick Start
 
 ```sh
-ssh-keygen -C barley -f ~/.ssh/id_barley -N '' -t ed25519
-ssh-keygen -I barley -s ~/.ssh/id_ed25519 -V +1d ~/.ssh/id_barley
-sed 's/^\(.*\)$/\1\ncert-authority \1/' < ~/.ssh/id_ed25519.pub > authorized_keys
-
 make release
 sudo make
 sudo make install
@@ -37,10 +33,6 @@ sow new field-1
 sow import sower.tar.zst
 sow start --ca --local sower
 
-echo '@cert-authority *' \
-  $(sudo cat /var/lib/machines/sower/var/lib/barley/ca.pub) \
-  >> ~/.ssh/known_hosts
-
 sudo mkdir /etc/qemu
 echo allow br0 > /etc/qemu/bridge.conf
 sudo cp qemu-seed.service /etc/systemd/system/
@@ -48,10 +40,18 @@ sudo systemctl daemon-reload
 sudo systemctl start qemu-seed
 journalctl -f -u qemu-seed
 
+echo '@cert-authority *' \
+  $(sudo cat /var/lib/machines/sower/var/lib/barley/ca.pub) \
+  >> ~/.ssh/known_hosts
+
+cat >> ~/.ssh/config <<EOF
+Host seed-*
+  User root
+  StrictHostKeyChecking yes
+EOF
+
 sudo make postgres.tar.zst
-zstdcat postgres.tar.zst | \
-  ssh -i ~/.ssh/id_barley -o StrictHostKeyChecking=yes root@seed-1 \
-  machinectl import-tar - postgres-1
+ssh seed-1 'zstdcat | machinectl import-tar - postgres-1' < postgres.tar.zst
 ```
 
 ## Setup
@@ -71,27 +71,40 @@ prevent it from also installing Docker as a dependency.
 When building the packer-builder-nspawn and packer-provisioner-apt plugins from
 source, symlink them into your working directory so that Packer can find them.
 
-Seed root account is passwordless and the only way to access a Seed host is by
-authenticating with an SSH key. Before building the Seed image, copy your
-public SSH key into `authorized_keys` in your working directory, and edit it to
-make SSH also accept it as a certificate authority. This will allow you to sign
-short-lived passwordless SSH certificates for use with automation.
+## Network
 
-Seed starts with all its physical Ethernet interfaces bound to a Linux bridge
-named br0. When starting a new container with `sow start`, Barley will create a
+Seed host binds all its physical Ethernet interfaces to a bridge named br0. To
+connect a new container to br0, Barley `sow start` command creates a following
 [systemd.nspawn(5)](https://www.freedesktop.org/software/systemd/man/systemd.nspawn.html)
-file like below under `/etc/systemd/nspawn`:
+container configuration file under `/etc/systemd/nspawn`:
 
 ```systemd
 [Network]
 Bridge=br0
 ```
 
-Sower expects to be directly connected to a network that already has a DHCP
-server (e.g. the router on a typical home network). You can use the same Linux
-bridge setup as described above to achieve that. Sower obtains its own IP
-configuration from DHCP and leaves it up to the existing DHCP server to
+Sower container expects to be directly connected to a network that already has
+a DHCP server (e.g. the router on a typical home network). Sower obtains its
+own IP configuration from DHCP and leaves it up to the existing DHCP server to
 allocate IP addresses to PXE clients.
+
+## SSH Access to Seeds
+
+Seed root account is passwordless and the only way to access a Seed host is by
+authenticating with an SSH key. When you create a new field with `sow new`,
+Barley will use your `~/.ssh/id_ed25519.pub` (or any other public key you
+specify with the `-k` option) as the admin key. When a Seed registers with
+Sower, it will be provisioned with an `authorized_keys` file that allows the
+field admin key to both login directly and to sign other keys.
+
+With that, you can generate short-lived passwordless SSH keys for use with
+automation:
+
+```sh
+ssh-keygen -C barley -f ~/.ssh/id_barley -N '' -t ed25519
+ssh-keygen -I barley -s ~/.ssh/id_ed25519 -V +1d ~/.ssh/id_barley
+ssh -i ~/.ssh/id_barley seed-1
+```
 
 ## Persistent Storage
 

@@ -12,21 +12,29 @@ use barley::{Data, print_table, tls};
 
 fn home() -> PathBuf {
     match env::var("HOME") {
-        Ok(home) => PathBuf::from(&home).join(".barley"),
+        Ok(home) => PathBuf::from(&home),
         Err(_) => panic!("HOME environment variable is not set"),
     }
 }
 
+fn home_ssh() -> PathBuf {
+    home().join(".ssh")
+}
+
+fn home_barley() -> PathBuf {
+    home().join(".barley")
+}
+
 fn fields_home() -> PathBuf {
-    home().join("fields")
+    home_barley().join("fields")
 }
 
 fn images_home() -> PathBuf {
-    home().join("images")
+    home_barley().join("images")
 }
 
 fn setup() {
-    Data::new(home()).unwrap();
+    Data::new(home_barley()).unwrap();
     Data::new(fields_home()).unwrap();
     Data::new(images_home()).unwrap();
 }
@@ -61,12 +69,16 @@ impl Field {
             .filter_map(|entry| Self::from_dir(&entry.unwrap()))
     }
 
-    fn create(&self) {
+    fn create(&self, key: &PathBuf) -> String {
         let path = self.path();
         if let Ok(_) = fs::metadata(&path) {
             panic!("Field '{}' already exists", &self.name);
         }
         Data::new(path).unwrap();
+        if let Err(err) = fs::copy(key, self.admin()) {
+            panic!("Failed to copy admin public key {:?}: {}", key, err);
+        }
+        tls::generate_root(&self.name, &self.cakey(), &self.cacert()).unwrap()
     }
 
     fn path(&self) -> PathBuf {
@@ -75,6 +87,10 @@ impl Field {
 
     fn file(&self, name: &str) -> PathBuf {
         self.path().join(&name)
+    }
+
+    fn admin(&self) -> PathBuf {
+        self.file("admin.pub")
     }
 
     fn cacert(&self) -> PathBuf {
@@ -92,14 +108,10 @@ fn ls() {
     print_table(&fields, "fields", &["FIELD"], |f| vec![&f.name]);
 }
 
-fn new(name: String) {
+fn new(name: String, key: Option<PathBuf>) {
     let field = Field::new(&name);
-    field.create();
-    let pw = tls::generate_root(
-        &name,
-        &field.cakey(),
-        &field.cacert(),
-    ).unwrap();
+    let key = key.unwrap_or(home_ssh().join("id_ed25519.pub"));
+    let pw = field.create(&key);
     println!("{} root.key password: {}", &name, &pw);
 }
 
@@ -283,10 +295,12 @@ impl Machine {
         self.command(&format!("systemd-nspawn -M {} -UPq sh -c '{}'", self.name, script))
     }
 
-    fn install(&self, src: &PathBuf, dst: &str, owner: &str, group: &str, mode: &str) {
+    fn install(&self, from: &PathBuf, to: &str, mode: &str) {
+        let to = format!("/var/lib/barley/{}", to);
         exec(
-            self.nspawn(&format!("install -m {} -o {} -g {} /dev/null {} && cat > {}", mode, owner, group, dst, dst))
-                .stdin(cat(src))
+            self.nspawn(&format!("install -m {} -o barley -g barley /dev/null {} && \
+                                  cat > {}", mode, to, to))
+                .stdin(cat(from))
         )
     }
 
@@ -329,9 +343,10 @@ impl Machine {
                 &key,
                 &cert,
             ).unwrap();
-            self.install(&key, "/var/lib/barley/machine.key", "barley", "barley", "600");
-            self.install(&cert, "/var/lib/barley/machine.crt", "barley", "barley", "644");
-            self.install(&self.field.cacert(), "/var/lib/barley/root.crt", "barley", "barley", "644");
+            self.install(&key, "machine.key", "600");
+            self.install(&cert, "machine.crt", "644");
+            self.install(&self.field.cacert(), "root.crt", "644");
+            self.install(&self.field.admin(), "admin.pub", "644");
         }
         self.write_config(network).unwrap();
         exec(&mut self.command(&format!("machinectl start {}", self.name)))
@@ -358,6 +373,10 @@ enum Op {
     New {
         /// Name of the new Barley field to be created
         name: String,
+        /// SSH public key that will be granted root access to Seeds,
+        /// default: ~/.ssh/id_ed25519.pub
+        #[structopt(short, long)]
+        key: Option<PathBuf>,
     },
 
     /// List imported images
@@ -403,7 +422,7 @@ fn main() {
     match opt.op {
         None => { ls() },
         Some(Op::Fields) => { ls() },
-        Some(Op::New { name }) => { new(name) },
+        Some(Op::New { name, key }) => { new(name, key) },
         Some(Op::Images) => { ls_images() },
         Some(Op::Import { path }) => { import(path) },
         Some(Op::Start { image, version, seed, local, ca, network }) => {
