@@ -44,12 +44,6 @@ echo '@cert-authority *' \
   $(sudo cat /var/lib/machines/sower/var/lib/barley/ca.pub) \
   >> ~/.ssh/known_hosts
 
-cat >> ~/.ssh/config <<EOF
-Host seed-*
-  User root
-  StrictHostKeyChecking yes
-EOF
-
 sudo make postgres.tar.zst
 ssh seed-1 'zstdcat | machinectl import-tar - postgres-1' < postgres.tar.zst
 ```

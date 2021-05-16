@@ -33,7 +33,32 @@ fn images_home() -> PathBuf {
     home_barley().join("images")
 }
 
+fn update_ssh_config() {
+    let config_path = home_ssh().join("config");
+    let mut config = fs::read_to_string(&config_path).unwrap_or("".to_string());
+    if let None = config.lines().find(|&s| s == "Host seed-*" ) {
+        if !config.is_empty() {
+            let mut backup = config_path.clone();
+            backup.set_file_name("config.barley-backup");
+            fs::metadata(&backup).expect_err(
+                "SSH config is missing a 'Host seed-*' line, but backup already exists. \
+                 Something must have gone wrong, please clean up your ~/.ssh/ manually."
+            );
+            fs::copy(&config_path, &backup).unwrap();
+        }
+        if !config.ends_with('\n') {
+            config.push('\n');
+        }
+        config.push_str("Host seed-*\n\tUser root\n\tStrictHostKeyChecking yes\n");
+        fs::write(&config_path, &config).unwrap();
+    }
+}
+
 fn setup() {
+    if let Err(_) = fs::metadata(home_ssh()) {
+        panic!("Missing ~/.ssh. Run ssh-keygen -t ed25519.");
+    }
+    update_ssh_config();
     Data::new(home_barley()).unwrap();
     Data::new(fields_home()).unwrap();
     Data::new(images_home()).unwrap();

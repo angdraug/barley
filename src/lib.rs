@@ -69,18 +69,14 @@ impl Data {
 
     pub fn read(&self, name: &str) -> Result<String, Error> {
         let path = self.file(&name);
-        match fs::read(&path) {
-            Ok(data) => Ok(String::from_utf8(data)?),
-            Err(err) => Err(Error::DataError(format!("Failed to read {:?}: {}", path, err))),
-        }
+        fs::read_to_string(&path)
+            .or_else(|err| Err(Error::DataError(format!("Failed to read {:?}: {}", path, err))))
     }
 
     pub fn write(&self, name: &str, data: &str) -> Result<(), Error> {
         let path = self.file(&name);
-        match fs::write(&path, &data) {
-            Ok(())   => Ok(()),
-            Err(err) => Err(Error::DataError(format!("Failed to write {:?}: {}", path, err))),
-        }
+        fs::write(&path, &data)
+            .or_else(|err| Err(Error::DataError(format!("Failed to write {:?}: {}", path, err))))
     }
 }
 
@@ -144,8 +140,8 @@ impl Sower {
     }
 
     fn detect_bind_ip(dnsmasq: &str) -> net::IpAddr {
-        match fs::read(&dnsmasq) {
-            Ok(conf) => Self::parse_dnsmasq(&str::from_utf8(&conf).unwrap()),
+        match fs::read_to_string(&dnsmasq) {
+            Ok(conf) => Self::parse_dnsmasq(&conf),
             Err(err) => panic!("Failed to read {}: {}", dnsmasq, err),
         }
     }

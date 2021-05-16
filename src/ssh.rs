@@ -18,11 +18,8 @@ pub fn sign(id: &str, ca: &PathBuf, key: &PathBuf) -> Result<(), Error> {
 }
 
 pub fn authorized_keys(path: &PathBuf) -> Result<String, Error> {
-    match fs::read(&path) {
-        Ok(bytes)  => {
-            let key = String::from_utf8_lossy(&bytes);
-            Ok(format!("{}\ncert-authority {}", key, key))
-        },
+    match fs::read_to_string(&path) {
+        Ok(key)  => Ok(format!("{}\ncert-authority {}", key, key)),
         Err(err) => Err(Error::IoError(format!("Failed to read {:?}: {}", path, err))),
     }
 }
