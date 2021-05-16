@@ -1,14 +1,14 @@
 use chrono::Local;
 use std::{env, ffi, fs};
 use std::cmp::Ordering;
-use std::io::{Error, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::{ChildStdout, Command, Stdio};
 use std::time::SystemTime;
 use structopt::StructOpt;
 use version_compare::{CompOp, VersionCompare};
 
-use barley::{Data, print_table, tls};
+use barley::{Data, Error, print_table, tls};
 
 fn home() -> PathBuf {
     match env::var("HOME") {
@@ -329,6 +329,16 @@ impl Machine {
         )
     }
 
+    fn check_network(&self, network: &Option<Vec<String>>) -> Result<(), Error> {
+        if self.seed.is_none()
+            && network.is_none()
+            && fs::read_to_string("/sys/class/net/br0/operstate")?.trim() != "up" {
+            // local machine with default network config requires br0
+            return Err(Error::NetError("Bridge br0 is down.".to_string()));
+        }
+        Ok(())
+    }
+
     fn import(&self) {
         exec(
             self.command(&format!("zstdcat | machinectl -q import-tar - {}", self.name))
@@ -355,6 +365,7 @@ impl Machine {
     }
 
     fn start(&self, ca: bool, network: Option<Vec<String>>) {
+        self.check_network(&network).unwrap();
         self.import();
         if ca {
             let key = self.data.file("machine.key");

@@ -77,6 +77,16 @@ container configuration file under `/etc/systemd/nspawn`:
 Bridge=br0
 ```
 
+You can use the same
+[systemd-networkd](https://www.freedesktop.org/software/systemd/man/systemd-networkd.html)
+configs that are used by Seeds to set up br0 for local containers:
+
+```sh
+sudo cp network/* /etc/systemd/network/
+sudo networkctl reload
+sudo networkctl up br0
+```
+
 Sower container expects to be directly connected to a network that already has
 a DHCP server (e.g. the router on a typical home network). Sower obtains its
 own IP configuration from DHCP and leaves it up to the existing DHCP server to

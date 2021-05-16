@@ -275,11 +275,13 @@ where F: Fn(&'a T) -> Vec<&'a str> {
 
 #[derive(Debug)]
 pub enum Error {
-    IoError(String),
-    StrError(String),
-    DataError(String),
-    OtpError(),
     CertError(),
+    ConfError(String),
+    DataError(String),
+    IoError(String),
+    NetError(String),
+    OtpError(),
+    StrError(String),
 }
 
 impl Display for Error {
