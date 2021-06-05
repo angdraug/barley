@@ -1,14 +1,15 @@
 use chrono::Local;
 use std::{env, ffi, fs};
 use std::cmp::Ordering;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
-use std::process::{ChildStdout, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::time::SystemTime;
 use structopt::StructOpt;
 use version_compare::{CompOp, VersionCompare};
 
-use barley::{Data, Error, print_table, tls};
+use barley::{Data, Error, print_table, tls, ToResult};
 
 fn home() -> PathBuf {
     match env::var("HOME") {
@@ -244,22 +245,6 @@ fn import(path: PathBuf) {
     }
 }
 
-fn exec(command: &mut Command) {
-    let status = command.status().unwrap();
-    if !status.success() {
-        panic!("{:?} failed: {:?}", command, status);
-    }
-}
-
-fn cat(src: &PathBuf) -> ChildStdout {
-    let c = Command::new("/bin/cat")
-        .arg(src)
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-    c.stdout.unwrap()
-}
-
 struct Machine {
     name: String,
     image: Image,
@@ -320,13 +305,22 @@ impl Machine {
         self.command(&format!("systemd-nspawn -M {} -UPq sh -c '{}'", self.name, script))
     }
 
-    fn install(&self, from: &PathBuf, to: &str, mode: &str) {
+    fn install(&self, from: &PathBuf, to: &str, mode: &str) -> Result<(), Error> {
         let to = format!("/var/lib/barley/{}", to);
-        exec(
-            self.nspawn(&format!("install -m {} -o barley -g barley /dev/null {} && \
-                                  cat > {}", mode, to, to))
-                .stdin(cat(from))
-        )
+        self.nspawn(&format!("install -m {} -o barley -g barley /dev/null {} && \
+                              cat > {}", mode, to, to))
+            .stdin(Stdio::from(File::open(from)?))
+            .to_result()
+    }
+
+    fn run(&self, script: &str) -> Command {
+        self.command(&format!("systemd-run -M {} -Pq --wait sh -c '{}'", self.name, script))
+    }
+
+    fn download(&self, name: &str) -> Result<(), Error> {
+        self.run(&format!("cat /var/lib/barley/{}", name))
+            .stdout(Stdio::from(File::create(self.data.file(name))?))
+            .to_result()
     }
 
     fn check_network(&self, network: &Option<Vec<String>>) -> Result<(), Error> {
@@ -334,16 +328,34 @@ impl Machine {
             && network.is_none()
             && fs::read_to_string("/sys/class/net/br0/operstate")?.trim() != "up" {
             // local machine with default network config requires br0
-            return Err(Error::NetError("Bridge br0 is down.".to_string()));
+            return Err(Error::from("Bridge br0 is down."));
         }
         Ok(())
     }
 
-    fn import(&self) {
-        exec(
-            self.command(&format!("zstdcat | machinectl -q import-tar - {}", self.name))
-                .stdin(cat(&self.image.path()))
-        )
+    fn import(&self) -> Result<(), Error> {
+        self.command(&format!("zstdcat | machinectl -q import-tar - {}", self.name))
+            .stdin(Stdio::from(File::open(&self.image.path())?))
+            .to_result()
+    }
+
+    fn install_ca(&self) -> Result<(), Error> {
+        let key = self.data.file("machine.key");
+        let cert = self.data.file("machine.crt");
+        tls::generate(&key)?;
+        println!("When prompted, enter root.key password for {}", &self.field.name);
+        tls::sign_ca(
+            &self.name,
+            &self.field.cacert(),
+            &self.field.cakey(),
+            &key,
+            &cert,
+        )?;
+        self.install(&key, "machine.key", "600")?;
+        self.install(&cert, "machine.crt", "644")?;
+        self.install(&self.field.cacert(), "root.crt", "644")?;
+        self.install(&self.field.admin(), "admin.pub", "644")?;
+        Ok(())
     }
 
     fn write_config(&self,  network: Option<Vec<String>>) -> Result<(), Error> {
@@ -351,41 +363,70 @@ impl Machine {
             "mkdir -p /etc/systemd/nspawn && \
              cat > /etc/systemd/nspawn/{}.nspawn", self.name))
             .stdin(Stdio::piped())
-            .spawn()?.stdin.unwrap();
-        cat.write(b"[Network]\n").unwrap();
+            .spawn()?
+            .stdin
+            .ok_or("Child process stdin has not been captured.")?;
+        cat.write_all(b"[Network]\n")?;
         if let Some(n) = network {
             for line in n {
-                cat.write(line.as_bytes())?;
-                cat.write(b"\n")?;
+                cat.write_all(line.as_bytes())?;
+                cat.write_all(b"\n")?;
             }
         } else {
-            cat.write(b"Bridge=br0\n")?;
+            cat.write_all(b"Bridge=br0\n")?;
         }
         Ok(())
     }
 
-    fn start(&self, ca: bool, network: Option<Vec<String>>) {
-        self.check_network(&network).unwrap();
-        self.import();
-        if ca {
-            let key = self.data.file("machine.key");
-            let cert = self.data.file("machine.crt");
-            tls::generate(&key).unwrap();
-            println!("When prompted, enter root.key password for {}", &self.field.name);
-            tls::sign_ca(
-                &self.name,
-                &self.field.cacert(),
-                &self.field.cakey(),
-                &key,
-                &cert,
-            ).unwrap();
-            self.install(&key, "machine.key", "600");
-            self.install(&cert, "machine.crt", "644");
-            self.install(&self.field.cacert(), "root.crt", "644");
-            self.install(&self.field.admin(), "admin.pub", "644");
+    fn wait_for(&self, test: &str) -> Result<(), Error> {
+        self.command(&format!(
+            "d=.01; \
+             for i in $(seq 0 8); do \
+               sleep $d; d=$(echo $d*2|bc); \
+               {} && break; \
+             done", test))
+            .to_result()
+    }
+
+    fn wait_for_machine(&self) -> Result<(), Error> {
+        self.wait_for(&format!(
+            "machinectl show --property=State --value {} | grep -q running",
+            self.name,
+        ))?;
+        self.wait_for(&format!("systemd-run -M {} -Pq --wait true", self.name))
+    }
+
+    fn get_ssh_ca(&self) -> Result<String, Error> {
+        self.download("ca.pub")?;
+        self.data.read("ca.pub")
+    }
+
+    fn update_known_hosts(&self, key: &str) -> Result<(), Error> {
+        if !key.starts_with("ssh-ed25519 ") {
+            return Err(Error::from(format!("Invalid key: {}", key)));
         }
-        self.write_config(network).unwrap();
-        exec(&mut self.command(&format!("machinectl start {}", self.name)))
+        OpenOptions::new()
+            .append(true)
+            .open(home_ssh().join("known_hosts"))?
+            .write_all(
+                format!("@cert-authority * {}-{}\n", key.trim(), self.image.version)
+                .as_bytes())?;
+        Ok(())
+    }
+
+    fn start(&self, ca: bool, network: Option<Vec<String>>) -> Result<(), Error> {
+        self.check_network(&network)?;
+        self.import()?;
+        if ca {
+            self.install_ca()?;
+        }
+        self.write_config(network)?;
+        self.command(&format!("machinectl start {}", self.name)).to_result()?;
+        if ca {
+            self.wait_for_machine()?;
+            self.update_known_hosts(&self.get_ssh_ca()?)?;
+        }
+        Ok(())
     }
 }
 
@@ -462,7 +503,9 @@ fn main() {
         Some(Op::Images) => { ls_images() },
         Some(Op::Import { path }) => { import(path) },
         Some(Op::Start { image, version, seed, local, ca, network }) => {
-            Machine::new(image, version, opt.field, seed, local).start(ca, network)
+            Machine::new(image, version, opt.field, seed, local)
+                .start(ca, network)
+                .unwrap()
         },
     };
 }

@@ -40,10 +40,6 @@ sudo systemctl daemon-reload
 sudo systemctl start qemu-seed
 journalctl -f -u qemu-seed
 
-echo '@cert-authority *' \
-  $(sudo cat /var/lib/machines/sower/var/lib/barley/ca.pub) \
-  >> ~/.ssh/known_hosts
-
 sudo make postgres.tar.zst
 ssh seed-1 'zstdcat | machinectl import-tar - postgres-1' < postgres.tar.zst
 ```

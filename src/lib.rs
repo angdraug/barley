@@ -3,7 +3,10 @@ use rand::random;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{error, fs, io, net, str, string};
-use std::{convert::From, fmt::{Debug, Display, Formatter}, path::PathBuf};
+use std::convert::From;
+use std::fmt::{Debug, Display, Formatter};
+use std::path::PathBuf;
+use std::process::Command;
 
 pub mod ssh;
 pub mod tls;
@@ -276,10 +279,10 @@ where F: Fn(&'a T) -> Vec<&'a str> {
 #[derive(Debug)]
 pub enum Error {
     CertError(),
+    CommandError(String),
     ConfError(String),
     DataError(String),
     IoError(String),
-    NetError(String),
     OtpError(),
     StrError(String),
 }
@@ -309,6 +312,35 @@ impl From<str::Utf8Error> for Error {
 impl From<string::FromUtf8Error> for Error {
     fn from(err: string::FromUtf8Error) -> Self {
         Error::StrError(err.to_string())
+    }
+}
+
+impl From<String> for Error {
+    fn from(err: String) -> Self {
+        Error::StrError(err)
+    }
+}
+
+impl From<&str> for Error {
+    fn from(err: &str) -> Self {
+        Error::StrError(err.to_string())
+    }
+}
+
+pub trait ToResult {
+    fn to_result(&mut self) -> Result<(), Error>;
+}
+
+// TODO: adapt to ExitStatusError in Rust 1.54
+// https://github.com/rust-lang/rust/pull/82973
+impl ToResult for Command {
+    fn to_result(&mut self) -> Result<(), Error> {
+        let status = self.status()?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(Error::CommandError(format!("{:?} failed: {:?}", self, status)))
+        }
     }
 }
 
