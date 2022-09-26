@@ -47,10 +47,12 @@ ssh seed-1 'zstdcat | machinectl import-tar - postgres-1' < postgres.tar.zst
 ## Setup
 
 Prerequisites:
+- [Systemd](https://systemd.io/) (systemd-container, systemd-networkd, systemd-resolved)
 - [Rust](https://www.rust-lang.org/)
 - [Packer](https://packer.io/)
 - [packer-builder-nspawn](https://git.sr.ht/~angdraug/packer-builder-nspawn)
 - [packer-provisioner-apt](https://git.sr.ht/~angdraug/packer-provisioner-apt)
+- zstd
 - gnutls-bin
 - intel-microcode
 - (optional) qemu-system-x86

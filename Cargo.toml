@@ -13,7 +13,7 @@ rand = "0.8"
 regex = "1"
 serde = { version = "1.0", features = ["derive"] }
 structopt = "0.3"
-version-compare = "*"
+version-compare = "0.1"
 
 [profile.release]
 lto = true

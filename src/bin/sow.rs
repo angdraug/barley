@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::SystemTime;
 use structopt::StructOpt;
-use version_compare::{CompOp, VersionCompare};
+use version_compare::Cmp;
 
 use barley::{Data, Error, print_table, tls, ToResult};
 
@@ -203,10 +203,10 @@ impl Image {
     }
 
     fn compare_versions(a: &str, b: &str) -> Ordering {
-        match VersionCompare::compare(a, b).unwrap() {
-            CompOp::Lt => Ordering::Less,
-            CompOp::Gt => Ordering::Greater,
-            CompOp::Eq => Ordering::Equal,
+        match version_compare::compare(a, b).unwrap() {
+            Cmp::Lt => Ordering::Less,
+            Cmp::Gt => Ordering::Greater,
+            Cmp::Eq => Ordering::Equal,
             _          => Ordering::Equal,
         }
     }
