@@ -18,7 +18,7 @@ build {
 
   provisioner "shell" {
     script = "packer/cryptpad.sh"
-    execute_command = "su - cryptpad -c '/bin/sh {{ .Path }}'"
+    execute_command = "su - cryptpad -c '/bin/sh -eux {{ .Path }}'"
   }
 
   provisioner "file" {

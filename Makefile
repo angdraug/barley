@@ -31,6 +31,9 @@ cryptpad.tar.zst: base.tar.zst
 envoy.tar.zst: base.tar.zst
 	packer build packer/envoy.pkr.hcl
 
+mastodon.tar.zst: base.tar.zst
+	packer build packer/mastodon.pkr.hcl
+
 nginx.tar.zst: base.tar.zst
 	packer build packer/nginx.pkr.hcl
 
